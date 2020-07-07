@@ -9,7 +9,13 @@ using Test
     @testset "Squared Euclidean Distance" begin
         objs = [[1,1,1], [2,3,4]]
         expected = [0. 14. ; 14. 0.]
-        @test l2(objs) == expected
+        @test l2dm(objs) == expected
+    end
+
+    @testset "l2 simple" begin
+        objs = [[1,1,1], [2,3,4]]
+        expected = 14.
+        @test l2(objs...) == expected
     end
 
     # KL

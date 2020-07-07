@@ -5,7 +5,7 @@ using StatsBase
 
 
 # functions
-export l2, kl, kldm, wasserstein1d, emd, energy, cdf_distance
+export l2, l2dm, kl, kldm, wasserstein1d, emd, energy, cdf_distance
 
 # types
 export EMD, Energy

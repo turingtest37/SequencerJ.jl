@@ -37,10 +37,12 @@ DM = Σ ((X[i] - X[j])^2) for i,j indexes on X
 
 🚟
 """
-function l2(objs; parallel = false)
-    A = hcat(objs...)'
-    return pairwise(SqEuclidean(), A, dims=1)
+function l2dm(objs)
+    A = hcat(objs...)
+    return pairwise(SqEuclidean(), A, dims=2)
 end
+
+l2(u,v) = SqEuclidean()(u,v)
 
 """
 Calculates the KL Divergence between pairs of elements
