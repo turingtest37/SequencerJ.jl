@@ -5,10 +5,12 @@ using StatsBase
 
 
 # functions
-export l2, kl, wasserstein1d, emd, energy, cdf_distance
+export l2, kl, kldm, wasserstein1d, emd, energy, cdf_distance
 
 # types
-export EMD
+export EMD, Energy
+
+import Distances: evaluate
 
 include("sequencer.jl")
 include("distancemetrics.jl")
