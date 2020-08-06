@@ -1,18 +1,27 @@
 module SequencerJulia
 
-using Distances
+using Reexport
+@reexport using Distances
 using StatsBase
+using SparseArrays
+using LightGraphs
+using SimpleWeightedGraphs
+using Logging
+using LinearAlgebra
 
+
+include("distancemetrics.jl")
+include("sequencer.jl")
 
 # functions
-export l2, l2dm, kl, kldm, wasserstein1d, emd, energy, cdf_distance
+export emd, energy, cdf_distance, sequence
 
 # types
 export EMD, Energy
 
-import Distances: evaluate
+export L2_METRIC, EMD_METRIC, KLD_METRIC, ENERGY_METRIC, ALL_METRICS
 
-include("sequencer.jl")
-include("distancemetrics.jl")
+# temp
+export _splitnorm, _mst, _startindex, elongation, _b_d_order
 
 end
