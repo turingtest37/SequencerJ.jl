@@ -1,13 +1,10 @@
 
-########################################################################################################
-        ######### STEP 1: load or calculate distance matrices for different estimators and scales    ###########
-########################################################################################################
 
-const L2_METRIC = Distances.SqEuclidean()
-const EMD_METRIC = EMD()
-const KLD_METRIC = Distances.KLDivergence()
-const ENERGY_METRIC = Energy()
-const ALL_METRICS = (L2_METRIC,EMD_METRIC,KLD_METRIC,ENERGY_METRIC)
+const L2 = Distances.SqEuclidean()
+const WASS1D = EMD()
+const KLD = Distances.KLDivergence()
+const ENERGY = Energy()
+const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)
 
 # dictionaries to hold intermediate results, keyed by (metric, scale)
 # list of elongation and orderings (BFS,DFS), one per Segment
@@ -43,13 +40,14 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 # Each row typically represents a distinct point in time or space where the
 # observed data were captured.
 #
-    @assert all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain NaN or infinite values."
+    @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain NaN or infinite values."
 
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
     @debug "A " A
 
     # replace zeros with epsilon itsy bitsy teeny tiny value
+    # TODO See if this map step can be removed safely
     map!(v->v ≈ 0. ? v+eps() : v, A, A)
 
     # create a sensible grid if one was not provided
@@ -72,7 +70,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         S, G = _splitnorm(s, grid, A)
         @debug "S after split" S
 
-        Dklms = zeros(size(A,2), size(A,2))#maybe thi needs to be zeros
+        Dklms = zeros(size(A,2), size(A,2))
         ηs = [] # Elongations per chunk
         orderings = [] # BFS, DFS orderings per chunk
 
@@ -80,8 +78,8 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         # one for each of n data series
         @inbounds for i in eachindex(S, G) # SEGMENTS
             #convert to a matrix
-            m = S[i] # r is a matrix already, yay!
-            g = G[i]
+            m = S[i] # m is a matrix already
+            g = G[i] # a vector
             @debug "matrix for distance calcs" m
             # m = hcat(r...)'
             Dklm = abs.(pairwise(alg, m; dims = 2)) .+ eps()

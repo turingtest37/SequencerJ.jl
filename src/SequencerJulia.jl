@@ -19,7 +19,7 @@ export emd, energy, cdf_distance, sequence
 # types
 export EMD, Energy
 
-export L2_METRIC, EMD_METRIC, KLD_METRIC, ENERGY_METRIC, ALL_METRICS
+export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
 # temp
 export _splitnorm, _mst, _startindex, elongation, _b_d_order

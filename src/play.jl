@@ -5,19 +5,19 @@ using SequencerJulia
 # using Statistics: mean
 #
 # using BenchmarkTools
-using Images
+# using Images
 
 # using UnbalancedOptimalTransport
 
-# a = [1. / x for x in 1:5]
-# Σa = sum(a)
-# wa = a / Σa
-# # A = Float32.(collect(1:5))
-#
-# b = [1. / x for x in 5:-1:1]
-# Σb = sum(b)
-# wb = b / Σb
-# # B = Float32.(collect(1:5))
+a = [1. / x for x in 1:5]
+Σa = sum(a)
+wa = a / Σa
+A = Float32.(collect(1:5))
+
+b = [1. / x for x in 5:-1:1]
+Σb = sum(b)
+wb = b / Σb
+B = Float32.(collect(1:5))
 # using EmpiricalCDFs
 # # function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 # u = EmpiricalCDF()
@@ -36,39 +36,42 @@ using Images
 # append!(v, wb)
 # push!(v, 0.0)
 # sort!(v)
-#
-# # u = ecdf(A; weights=wa)
-# # v = ecdf(B; weights=wb)
-# # values are pre-sorted ascending
-# uv = Float32.(collect(1:length(u)))
-# vv = Float32.(collect(1:length(v)))
-# # weights are pre-sorted in ECDF to match values
-# # uw = Float32.(u.weights)
-# # vw = Float32.(v.weights)
-#
-# # merge and sort all values
-# uplusv = vcat(uv, vv)
-# sort!(uplusv)
+using StatsBase
+u = ecdf(A; weights=wa)
+v = ecdf(B; weights=wb)
+
+uv = Float32.(u.sorted_values)
+vv = Float32.(v.sorted_values)
+# weights are pre-sorted in ECDF to match values
+uw = u.weights.values
+vw = v.weights.values
+
+# shortcut in case the grids are identical
+if uv == vv
+    return sum(abs.(u(uv) .- v(vv)))
+end
+uplusv = vcat(uv, vv)
+sort!(uplusv)
 # @debug "uplusv" uplusv
 # # the underlying grid space on which we operate
-# deltas = diff(uplusv, dims = 1)
+deltas = diff(uplusv, dims = 1)
 # # creates a n-1 size result for a length n list
 # @debug "Delta Force!" deltas
 #
 # D = [i / length(uplusv) for i in uplusv]
 
 # cumulated sum of weights => CDF
-# sumuw = vcat([zero(Float32)], cumsum(uw))
-# sumvw = vcat([zero(Float32)], cumsum(vw))
+sumuw = vcat([zero(Float32)], cumsum(uw))
+sumvw = vcat([zero(Float32)], cumsum(vw))
 # add
 
 # add 1 to each index to accomodate the [0] added above to cumulative sums
-    # ucdf_i = u(x) collect(searchsortedlast(uv, x) + 1 for x in uplusv[1:end-1])
-    # vcdf_i = collect(searchsortedlast(vv, x) + 1 for x in uplusv[1:end-1])
+ucdf_i = collect(searchsortedlast(uv, x) + 1 for x in uv[1:end-1])
+vcdf_i = collect(searchsortedlast(vv, x) + 1 for x in uplusv[1:end-1])
     # ucdf_i = collect(searchsortedlast(uv, x) + 1 for x in uplusv[1:end-1])
     # vcdf_i = collect(searchsortedlast(vv, x) + 1 for x in uplusv[1:end-1])
 # normalize CDF to range [0,1]
-    # @time ucdf = sumuw[ucdf_i] ./ last(sumuw)
+ucdf = sumuw[ucdf_i] ./ last(sumuw)
     # vcdf = sumvw[vcdf_i] ./ last(sumvw)
     # @debug "ucdf" ucdf
     # @debug "vcdf" vcdf
@@ -112,8 +115,8 @@ using Images
 #
 # k = emd(wa, wb)
 
-imgmed = load(joinpath(@__DIR__,"..","resources","bread.jpeg"));
-AM = convert(Matrix{Float32}, float32.(Gray.(imgmed)));
+# imgmed = load(joinpath(@__DIR__,"..","resources","bread.jpeg"));
+# AM = convert(Matrix{Float32}, float32.(Gray.(imgmed)));
 
 # imgsmall = load(joinpath(@__DIR__,"..","resources","colony.png"));
 # A = convert(Matrix{Float32}, float32.(Gray.(imgsmall)));
@@ -121,7 +124,7 @@ AM = convert(Matrix{Float32}, float32.(Gray.(imgmed)));
 # A = A isa Vector ? hcat(A...) : A
 # if isnothing(grid)
 
-Pw = sequence(AM)
+# Pw = sequence(AM)
 
 # map!(v->v≈0. ? v+eps() : v, A, A)
 #

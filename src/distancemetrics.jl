@@ -15,7 +15,7 @@ function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
     length(u) == length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) == length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
-    cdf_distance(ecdf(u; weights = uw), ecdf(v; weights = vw), 1)
+    cdf_distance(ecdf(Float32.(u); weights = uw), ecdf(Float32.(v); weights = vw), 1)
 end
 
 (::EMD)(u,v=u) = EMD(u,v)
@@ -43,7 +43,7 @@ function Energy(u,v,uw,vw)
     length(u) ==  length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) ==  length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
     ndims(u) == 1 && ndims(v) == 1 || error("Only 1-d data vectors are supported.")
-    sqrt(2) * cdf_distance(ecdf(u; weights = uw), ecdf(v; weights = vw), 2)
+    sqrt(2) * cdf_distance(ecdf(Float32.(u); weights = uw), ecdf(Float32.(v); weights = vw), 2)
 end
 
 function Energy(u,v)
@@ -67,13 +67,25 @@ With p=2, the distance is Energy.
 function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 
 # values are pre-sorted ascending
-    uv = Float32.(u.sorted_values)
-    vv = Float32.(v.sorted_values)
-# weights are pre-sorted in ECDF to match values
-    uw = Float32.(u.weights)
-    vw = Float32.(v.weights)
+    uv = u.sorted_values
+    vv = v.sorted_values
+# shortcut return in case the grids are identical
+# Just return the sum of differences across the two CDFs
+    if uv == vv
+        if p == 1
+            return sum(abs.(u(uv) .- v(vv)))
+        elseif p == 2
+            return sqrt(sum( (u(uv) .- v(vv)) .^ 2 ))
+        else
+            return sum(abs.(u(uv) - v(vv)) .^ p) ^ 1/p
+        end
+    end
 
-# merge and sort all values
+# weights are pre-sorted in ECDF to match values
+    uw = u.weights.values
+    vw = v.weights.values
+
+# merge and sort all grid values
     uplusv = vcat(uv, vv)
     sort!(uplusv)
     @debug "uplusv" uplusv
@@ -86,12 +98,15 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
     v2 = ecdf(push!(vv, 0.0); weights=push!(vw, 0.0))
     A = uplusv[1:end-1]
     @debug "A = uplusv[1:end-1]" A
+    UA = u2(A)
+    @debug "ecdf of U(A)" UA
+    VA = v2(A)
+    @debug "ecdf of V(A)" VA
 
     if p == 1
-        # return sum(abs.(ucdf .- vcdf) .* deltas)
-        return sum(abs.(u2(A) .- v2(A)) .* deltas)
+        return sum(abs.(UA .- VA) .* deltas)
     elseif p == 2
-        return sqrt(sum( (u2(A) .- v2(A)) .^ 2 .* deltas ))
+        return sqrt(sum( (UA .- VA) .^ 2 .* deltas ))
         # return sqrt(sum((ucdf .- vcdf) .^ 2 .* deltas))
     else
         return sum(abs.(u.(A) - v.(A)) .^ p .* deltas) ^ 1/p

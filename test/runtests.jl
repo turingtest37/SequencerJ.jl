@@ -8,7 +8,7 @@ using Test
     imgsmall = load(joinpath(@__DIR__,"..","resources","colony.png"))
     SMALL = convert(Matrix{Float32}, float32.(Gray.(imgsmall)))
 
-    imgbig = load(joinpath(@__DIR__,"..","resources","h+v.jpg"))
+    imgbig = load(joinpath(@__DIR__,"..","resources","Hummingbird!.jpeg"))
     BIG = convert(Matrix{Float32}, float32.(Gray.(imgbig)))
 
 
@@ -27,7 +27,7 @@ using Test
     end
 
     @testset "large image does not fail." begin
-        @test sequence(BIG; scales=[2]) !== nothing
+        @test sequence(BIG; scales=[2], metrics=(KLD, WASS1D)) !== nothing
     end
 
 
