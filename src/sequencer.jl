@@ -9,6 +9,12 @@ const KLD_METRIC = Distances.KLDivergence()
 const ENERGY_METRIC = Energy()
 const ALL_METRICS = (L2_METRIC,EMD_METRIC,KLD_METRIC,ENERGY_METRIC)
 
+# dictionaries to hold intermediate results, keyed by (metric, scale)
+# list of elongation and orderings (BFS,DFS), one per Segment
+d_e_o = Dict()
+# elongation and orderings for the cumulated weighted distances
+d_w = Dict()
+
 """
 # variables from the python code
 # INPUT
@@ -43,8 +49,8 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     A = A isa Vector ? hcat(A...) : A
     @debug "A " A
 
-    # replace zeros with epsilon teeny tiny value
-    map!(v->v≈0. ? v+eps() : v, A, A)
+    # replace zeros with epsilon itsy bitsy teeny tiny value
+    map!(v->v ≈ 0. ? v+eps() : v, A, A)
 
     # create a sensible grid if one was not provided
     if isnothing(grid)
@@ -58,8 +64,6 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     MST_all = []
     η_all = Float64[]
     # Dkls = []
-    d_e_o = Dict{Tuple,Tuple}()
-    d_w = Dict{Tuple,Tuple}()
     for (alg,s) in combos
     # build a master dictionary of distance matrices for all metrics and scales
         # Dijk = Dict{Tuple,Vector{Array{T}}}()
@@ -74,7 +78,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
         # Each m row in S contains n segments of data,
         # one for each of n data series
-        for i in eachindex(S, G) # SEGMENTS
+        @inbounds for i in eachindex(S, G) # SEGMENTS
             #convert to a matrix
             m = S[i] # r is a matrix already, yay!
             g = G[i]
@@ -121,8 +125,8 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         BFSkl, DFSkl = _b_d_order(MSTkl, stidx)
 
         # Store this crap for later
-        d_e_o[(alg,s)] = (ηs, orderings)
-        d_w[(alg,s)] = (ηkl, (BFSkl, DFSkl))
+        global d_e_o[(alg,s)] = (ηs, orderings)
+        global d_w[(alg,s)] = (ηkl, (BFSkl, DFSkl))
     end
 
     # Weighted average of all metrics, scales and chunks (klm)
@@ -138,27 +142,34 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     P = zeros(typeof(Ση),N,N)
     @debug "P initial" P
 
-    for idx in eachindex(MST_all, η_all)
+    @inbounds for idx in eachindex(MST_all, η_all)
         g = MST_all[idx]
         W = LightGraphs.weights(g)
         η = η_all[idx]
         for e in edges(g)
             i,j = src(e),dst(e)
-            # idx = to_indices(P, (src(e),dst(e)))
-            # idxr = to_indices(P, reverse((src(e),dst(e))))
             d = W[i,j]
-            @debug "weight d" d
-            P[i,j] = P[j,i] += η * 1.0 / d
+            P[i,j] = P[j,i] += η * 1.0 / (d + eps())
         end
     end
     Pw = P / Ση
+    di = [CartesianIndex(i,i) for i in 1:size(Pw,1)]
+    Pw[di] .= Inf
     @debug "amazing" Pw
     ## end of Step 2
 
     ## Start Step 3
+    D = similar(Pw)
+    D .= 1 ./ Pw
 
-    # D = 1 ./ P
-    Pw
+    MSTD = _mst(D) #MST
+    stidx = _startindex(MSTD) # Least central point of averaged MST
+    ηD = elongation(MSTD, stidx) + 1
+    @debug "elongation of MSTD " ηD
+
+    BFSD, DFSD = _b_d_order(MSTD, stidx)
+
+    return MSTD, ηD, BFSD, DFSD
 end
 
 """
@@ -173,18 +184,23 @@ function _startindex(g)
 end
 
 
-halflen(paths) = mean(paths)
+halflen(paths) = mean(paths) + eps()
 
-halfwidth(paths) = mean(count(v->v==k, paths) for k in unique(paths)) / 2
+halfwidth(paths) = (mean(count(v->v==k, paths) for k in unique(paths)) + eps()) / 2
 
 function elongation(g, startidx)
     spaths = dijkstra_shortest_paths(g, startidx)
+    @debug "spaths.dists" spaths.dists
+    # remove those annoying Infs that ruin it for everyone else
+    # D = map(v -> clamp(v, eps(), typemax(Float32)), spaths.dists)
 # elongation ratio over the shortest paths from the center node of a
 # minimum spanning tree of the given distance matrix
-    @debug "spaths.dists" spaths.dists
-    # remove those nasty Infs that ruin it for everybody
-    D = map(v -> isinf(v) ? typemax(v) : v, spaths.dists)
-    return halflen(D) / halfwidth(D)
+    hlen = halflen(spaths.dists)
+    hwid = halfwidth(spaths.dists)
+    hlen = clamp(hlen, eps(), floatmax(Float32))
+    hwid = clamp(hwid, eps(), floatmax(Float32))
+    @debug "halflen, halfwidth" hlen hwid
+    return hlen / hwid
 end
 
 function _b_d_order(g, minidx)
