@@ -1,27 +1,34 @@
 
-struct EMD <: SemiMetric end
+struct EMD <: SemiMetric
+    grids::Union{Nothing,Tuple}
+end
 
+EMD() = EMD(nothing)
 """
 Returns fhe Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
 between the two given vectors (which are treated as weights on a grid
 defined by the first axis of u).
 """
-function EMD(u, v = u)
-    grid = Array(first(axes(u)))
-    EMD(grid, grid, u, v)
+function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
+    gridu = collect(first(axes(u)))
+    gridv = collect(first(axes(v)))
+    EMD(gridu, gridv, u, v)
 end
 
 function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
     length(u) == length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) == length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
-    cdf_distance(ecdf(Float32.(u); weights = uw), ecdf(Float32.(v); weights = vw), 1)
+    cdf_distance(ecdf(float(u); weights = uw), ecdf(float(v); weights = vw), 1)
 end
 
-(::EMD)(u,v=u) = EMD(u,v)
+function (m::EMD)(u,v=u)
+    m.grids === nothing ? EMD(u,v) : EMD(m.grids...,u,v)
+end
+
 (::EMD)(u,v,uw,vw) = EMD(u,v,uw,vw)
 
-emd(u::AbstractArray, v = u; grid=nothing) = EMD(u, v)
+emd(u::AbstractArray, v = u) = EMD(u, v)
 
 emd(u,v,uw,vw) = EMD(u,v,uw,vw)
 
@@ -33,22 +40,29 @@ emd(u,v,uw,vw) = EMD(u,v,uw,vw)
 # @debug "A" A
 # return pairwise(Energy(), A, dims=1)
 
-struct Energy <: SemiMetric end
+struct Energy <: SemiMetric
+    grids::Union{Nothing,Tuple}
+end
+
+Energy() = Energy(nothing)
 
 # enables dispatching on the type directly
-(::Energy)(u,v) = Energy(u,v)
+function (m::Energy)(u,v)
+    m.grids === nothing ? Energy(u,v) : Energy(m.grids...,u,v)
+end
+
 (::Energy)(u,v,uw,vw) = Energy(u,v,uw,vw)
 
 function Energy(u,v,uw,vw)
     length(u) ==  length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) ==  length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
     ndims(u) == 1 && ndims(v) == 1 || error("Only 1-d data vectors are supported.")
-    sqrt(2) * cdf_distance(ecdf(Float32.(u); weights = uw), ecdf(Float32.(v); weights = vw), 2)
+    sqrt(2) * cdf_distance(ecdf(float.(u); weights = uw), ecdf(float.(v); weights = vw), 2)
 end
 
 function Energy(u,v)
-    gridu = Array(first(axes(u)))
-    gridv = Array(first(axes(v)))
+    gridu = collect(first(axes(u)))
+    gridv = collect(first(axes(v)))
     Energy(gridu,gridv,u,v)
 end
 
