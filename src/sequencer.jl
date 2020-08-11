@@ -33,6 +33,7 @@ d_w = Dict()
 documentation
 """
 function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where T
+
     combos = [(m,s) for m in metrics, s in scales]
 
 # We need to ensure that A is, or becomes, oriented so that
@@ -46,18 +47,19 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     A = A isa Vector ? hcat(A...) : A
     @debug "A " A
 
-    # replace zeros with epsilon itsy bitsy teeny tiny value
-    # TODO See if this map step can be removed safely
+    @debug "scales,metrics,grid" scales metrics grid
+    # replace zeros with epsilon (itsy bitsy teeny tiny value)
+# DONE See if this map step can be removed safely. Answer: No, it must remain in place!
     map!(v->v ≈ 0. ? v+eps() : v, A, A)
 
     # create a sensible grid if one was not provided
     if isnothing(grid)
-        grid = Float32.(collect(axes(A,1)))
+        grid = float(collect(axes(A,1)))
     elseif !(eltype(grid) isa AbstractFloat)
-        grid = Float32.(grid)
+        grid = float(grid)
     end
-
     @assert length(grid) == size(A,1) # down the column...
+    @debug "grid after creation/floatation" grid
 
     MST_all = []
     η_all = Float64[]
@@ -79,9 +81,12 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         @inbounds for i in eachindex(S, G) # SEGMENTS
             #convert to a matrix
             m = S[i] # m is a matrix already
-            g = G[i] # a vector
+            localgrid = G[i] # a vector
             @debug "matrix for distance calcs" m
             # m = hcat(r...)'
+            if alg in (EMD, Energy)
+                alg = alg((localgrid, localgrid))
+            end
             Dklm = abs.(pairwise(alg, m; dims = 2)) .+ eps()
             @debug "Dklm" Dklm
 
@@ -134,11 +139,10 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
     N = maximum(nv.(MST_all)) # vector of Graphs
     @debug "maximum of nv.(MST_all)" N
-    # ???? Why ??
-    Ση = sum(η_all) # vector of Floats
 
-    P = zeros(typeof(Ση),N,N)
-    @debug "P initial" P
+    # A proximity matrix to be filled with MST elongation-weighted edge
+    # distances (which are actually weights as well)
+    P = zeros(N,N)
 
     @inbounds for idx in eachindex(MST_all, η_all)
         g = MST_all[idx]
@@ -150,18 +154,23 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             P[i,j] = P[j,i] += η * 1.0 / (d + eps())
         end
     end
+    # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
+    Ση = sum(η_all)
     Pw = P / Ση
+    # Put Inf on the 1,1 diagonal to form a true proximity matrix
     di = [CartesianIndex(i,i) for i in 1:size(Pw,1)]
     Pw[di] .= Inf
-    @debug "amazing" Pw
-    ## end of Step 2
+    @debug "Amazing! Pw Pw Pw!" Pw
 
-    ## Start Step 3
+    # Invert the proximity matrix to get a final distance matrix, w/ zeros
+    # on the diagonal
     D = similar(Pw)
     D .= 1 ./ Pw
 
+    # final minimum spanning tree for analysis
     MSTD = _mst(D) #MST
     stidx = _startindex(MSTD) # Least central point of averaged MST
+    # Here's that elongation thing again...
     ηD = elongation(MSTD, stidx) + 1
     @debug "elongation of MSTD " ηD
 
@@ -238,25 +247,26 @@ algorithm. The scale and returns a Dictionary of DMs.
 """
 function _splitnorm(scale, grid, A)
     @debug "scale" scale
-    # @show grid
-    # @show A¡
+    @debug "grid" grid
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
 
+    collen = size(A,1)
+    @debug "collen" collen
     # break up each column of A into N chunks, where N = scale
-    chunklen = cld(size(A,1), scale)
+    chunklen = cld(collen, scale)
     @debug "chunklen" chunklen
 
-    N = cld(size(A,1), chunklen) # Number of chunks
+    N = cld(collen, chunklen) # Number of chunks
     @debug "N (number of bins)" N
 
     slices=[]
     grids=[]
     # range of chunk starting indices
-    chunkrange = 1:chunklen:size(A,1)
+    chunkrange = 1:chunklen:collen
     for i in chunkrange
         ii = i + chunklen - 1 # thank you, 1-based indexing
         # use the "end" keyword on the last slice to mop up the remainder
-        ii = clamp(ii, 1, size(A,1))
+        ii = clamp(ii, 1, collen)
         S = A[i:ii, :]
         @debug "slice S" S
         G = grid[i:ii]

@@ -6,7 +6,7 @@
         @testset "Squared Euclidean Distance Matrix" begin
             objs = [[1,1,1], [2,3,4]]
             expected = [0. 14. ; 14. 0.]
-            A = hcat(objs...)' # makes 2x3 array
+            A = permutedims(hcat(objs...)) # makes 2x3 array
             @test pairwise(SqEuclidean(), A, dims = 1) == expected
         end
 
@@ -33,21 +33,21 @@
         end
 
 
-        @testset "EMD with grid" begin
+        @testset "EMD with grid provided, same result as python" begin
             objs = [[3.4, 3.9, 7.5, 7.8], [4.5, 1.4],
             [1.4, 0.9, 3.1, 7.2], [3.2, 3.5]]
             expected = 4.0781331438047861
             @test EMD(objs...) ≈ expected
         end
 
-        @testset "EMD built-in grid no fail" begin
+        @testset "EMD grid provided, different constructor, no fail" begin
             g = [0.5, 1.0, 1.5, 2.0]
             u = [3.4, 3.9, 7.5, 7.8]
             v = [1.4, 0.9, 3.1, 7.2]
             @test EMD((g,g))(u,v) !== nothing
         end
 
-        @testset "EMD with grid, different constructor" begin
+        @testset "EMD with grid, different constructor, same result as python" begin
             g1 = [3.4, 3.9, 7.5, 7.8]
             g2 = [4.5, 1.4]
             u = [1.4, 0.9, 3.1, 7.2]

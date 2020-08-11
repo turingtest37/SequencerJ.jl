@@ -19,7 +19,7 @@ function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
     length(u) == length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) == length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
-    cdf_distance(ecdf(float(u); weights = uw), ecdf(float(v); weights = vw), 1)
+    cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 1)
 end
 
 function (m::EMD)(u,v=u)
@@ -57,7 +57,7 @@ function Energy(u,v,uw,vw)
     length(u) ==  length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) ==  length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
     ndims(u) == 1 && ndims(v) == 1 || error("Only 1-d data vectors are supported.")
-    sqrt(2) * cdf_distance(ecdf(float.(u); weights = uw), ecdf(float.(v); weights = vw), 2)
+    sqrt(2) * cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 2)
 end
 
 function Energy(u,v)
@@ -83,46 +83,35 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 # values are pre-sorted ascending
     uv = u.sorted_values
     vv = v.sorted_values
-# shortcut return in case the grids are identical
-# Just return the sum of differences across the two CDFs
-    if uv == vv
-        if p == 1
-            return sum(abs.(u(uv) .- v(vv)))
-        elseif p == 2
-            return sqrt(sum( (u(uv) .- v(vv)) .^ 2 ))
-        else
-            return sum(abs.(u(uv) - v(vv)) .^ p) ^ 1/p
-        end
-    end
-
-# weights are pre-sorted in ECDF to match values
-    uw = u.weights.values
-    vw = v.weights.values
-
-# merge and sort all grid values
-    uplusv = vcat(uv, vv)
+    # merge and sort all grid values
+    # We insert a zero to ensure that the first element's
+    # grid distance survives the diff operation
+    uplusv = vcat(0., uv, vv)
     sort!(uplusv)
     @debug "uplusv" uplusv
-# the underlying grid space on which we operate
-    deltas = diff(uplusv, dims = 1)
-# creates a n-1 size result for a length n list
-    @debug "Delta Force!" deltas
+    Δx = diff(uplusv, dims = 1)
+    @debug "Delta Force!" Δx
 
-    u2 = ecdf(push!(uv, 0.0); weights=push!(uw, 0.0))
-    v2 = ecdf(push!(vv, 0.0); weights=push!(vw, 0.0))
-    A = uplusv[1:end-1]
-    @debug "A = uplusv[1:end-1]" A
-    UA = u2(A)
-    @debug "ecdf of U(A)" UA
-    VA = v2(A)
-    @debug "ecdf of V(A)" VA
+# shortcut return in case the grids are identical
+# Just return the sum of differences across the two CDFs
+# TODO: Make the shortcut work with non-unit grids
+    if uv == vv # we can safely remove zeros from the delta
+        Δx = filter(v->!iszero(v), Δx)
+        UA = u(uv) # calculate u,v CDFs separately
+        VA = v(vv)
+    else
+        A = uplusv[1:end-1]
+        @debug "A = uplusv[1:end-1]" A
+        UA = u(A) # Calculate CDFs on whole domain
+        VA = v(A)
+    end
+    @debug "Δx UA VA" Δx UA VA
 
     if p == 1
-        return sum(abs.(UA .- VA) .* deltas)
+        return sum(abs.(UA .- VA) .* Δx)
     elseif p == 2
-        return sqrt(sum( (UA .- VA) .^ 2 .* deltas ))
-        # return sqrt(sum((ucdf .- vcdf) .^ 2 .* deltas))
+        return sqrt(sum( (UA .- VA) .^ 2 .* Δx ))
     else
-        return sum(abs.(u.(A) - v.(A)) .^ p .* deltas) ^ 1/p
+        return sum(abs.((UA .- VA)) .^ p .* Δx) ^ 1/p
     end
 end
