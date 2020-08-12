@@ -7,7 +7,8 @@ using SparseArrays
 using LightGraphs
 using SimpleWeightedGraphs
 using Logging
-using LinearAlgebra
+using LinearAlgebra: issymmetric, Symmetric, I
+# using Random: shuffle
 
 
 include("distancemetrics.jl")

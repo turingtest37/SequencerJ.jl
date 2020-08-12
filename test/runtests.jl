@@ -23,13 +23,22 @@ using Test
     end
 
     @testset "small image, multiple scales." begin
-        @test sequence(SMALL; scales=[1,2,8]) != nothing
+        @test sequence(SMALL; scales=[1,2,8]) !== nothing
     end
 
     @testset "large image does not fail." begin
         @test sequence(BIG; scales=[2], metrics=(KLD, WASS1D)) !== nothing
     end
 
+    @testset "reorder small image" begin
+        using Random, LightGraphs
+
+        Idx = shuffle(axes(SMALL,2))
+        imgshuff = SMALL[:,Idx]
+        MSTD, ηD, BFSD = sequence(imgshuff; scales=(1), metrics=(KLD, WASS1D))
+        res = SMALL[:, collect(vertices(BFSD))]
+        @test SMALL == res
+    end
 
 
 end

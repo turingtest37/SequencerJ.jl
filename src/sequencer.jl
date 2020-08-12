@@ -6,6 +6,9 @@ const KLD = Distances.KLDivergence()
 const ENERGY = Energy()
 const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)
 
+# Smallest weight/distance (instead of 0 or Inf)
+const ϵ = 1e-6
+
 # dictionaries to hold intermediate results, keyed by (metric, scale)
 # list of elongation and orderings (BFS,DFS), one per Segment
 d_e_o = Dict()
@@ -87,21 +90,21 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             if alg in (EMD, Energy)
                 alg = alg((localgrid, localgrid))
             end
-            Dklm = abs.(pairwise(alg, m; dims = 2)) .+ eps()
+            Dklm = abs.(pairwise(alg, m; dims = 2)) .+ ϵ
             @debug "Dklm" Dklm
 
             MSTklm = _mst(Dklm) #MST
             startidx = _startindex(MSTklm)
-            @debug "start idx for MSTklm" startidx
 
-            η = elongation(MSTklm, startidx) + 1
+            η = elongation(MSTklm, startidx)
             η = isnan(η) || isinf(η) ? typemin(η) : η
             @debug "elongation for Dklm" η
             push!(ηs, η)
 
 # weight the distance matrix by its elongation factor
             Dklm_e = η .* Dklm
-            map!(v -> isinf(v) ? typemin(v) : v, Dklm_e, Dklm_e)
+            clamp!(Dklm_e, eps(), typemax(eltype(Dklm_e)))
+            # map!(v -> isinf(v) ? typemax(v) : v, , Dklm_e)
             @debug "Dklm_e after elongation" Dklm_e
             Dklms .+= Dklm_e
 
@@ -119,17 +122,18 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         Dkl = Dklms / sum(ηs) # Weighted average over all chunks for <alg,s>
         @debug "elongation-weighted Dkl" Dkl
         MSTkl = _mst(Dkl)
+        @debug ""
         push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
         stidx = _startindex(MSTkl) # Least central point of averaged MST
-        ηkl = elongation(MSTkl, stidx) + 1
+        ηkl = elongation(MSTkl, stidx)
         @debug "elongation of weighted Dkls" ηkl
         push!(η_all, ηkl) # All elongations (1 per alg,s combo)
 
-        BFSkl, DFSkl = _b_d_order(MSTkl, stidx)
+        BFSkl = bfs_tree(MSTkl, stidx)
 
-        # Store this crap for later
+        # Store these as intermediate results
         global d_e_o[(alg,s)] = (ηs, orderings)
-        global d_w[(alg,s)] = (ηkl, (BFSkl, DFSkl))
+        global d_w[(alg,s)] = (ηkl, BFSkl)
     end
 
     # Weighted average of all metrics, scales and chunks (klm)
@@ -137,12 +141,13 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     # @debug Dall
     # Dall seems not to be used by the rest of the algorithm!!
 
-    N = maximum(nv.(MST_all)) # vector of Graphs
-    @debug "maximum of nv.(MST_all)" N
+    # N = maximum(nv.(MST_all)) # vector of Graphs
+    # @debug "maximum of nv.(MST_all)" N
+    N = size(A,2)
 
-    # A proximity matrix to be filled with MST elongation-weighted edge
+    # A sparse proximity matrix to be filled with MST elongation-weighted edge
     # distances (which are actually weights as well)
-    P = zeros(N,N)
+    P = spzeros(N,N)
 
     @inbounds for idx in eachindex(MST_all, η_all)
         g = MST_all[idx]
@@ -151,32 +156,34 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         for e in edges(g)
             i,j = src(e),dst(e)
             d = W[i,j]
-            P[i,j] = P[j,i] += η * 1.0 / (d + eps())
+            P[i,j] = P[j,i] += η * 1.0 / d
         end
     end
     # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
     Ση = sum(η_all)
     Pw = P / Ση
     # Put Inf on the 1,1 diagonal to form a true proximity matrix
-    di = [CartesianIndex(i,i) for i in 1:size(Pw,1)]
-    Pw[di] .= Inf
+    Pw .= sparse(Matrix(Inf*I, size(Pw)...))
     @debug "Amazing! Pw Pw Pw!" Pw
 
     # Invert the proximity matrix to get a final distance matrix, w/ zeros
     # on the diagonal
     D = similar(Pw)
     D .= 1 ./ Pw
+    @debug "D" D
 
     # final minimum spanning tree for analysis
     MSTD = _mst(D) #MST
+    @debug "final MSTD" MSTD
     stidx = _startindex(MSTD) # Least central point of averaged MST
     # Here's that elongation thing again...
-    ηD = elongation(MSTD, stidx) + 1
+    ηD = elongation(MSTD, stidx)
     @debug "elongation of MSTD " ηD
 
-    BFSD, DFSD = _b_d_order(MSTD, stidx)
+    BFSD = bfs_tree(MSTD, stidx)
+    @debug "final BFSD" BFSD
 
-    return MSTD, ηD, BFSD, DFSD
+    return MSTD, ηD, BFSD
 end
 
 """
@@ -191,30 +198,30 @@ function _startindex(g)
 end
 
 
-halflen(paths) = mean(paths) + eps()
+halflen(paths) = mean(paths)
 
-halfwidth(paths) = (mean(count(v->v==k, paths) for k in unique(paths)) + eps()) / 2
+halfwidth(paths) = mean(count(v->v==k, paths) for k in unique(paths)) / 2
 
+"""`julia`
+
+`elongation(g, startidx)`
+
+Returns the ratio of the graph half-length (mean of path distances) over the 
+half-width, defined as the mean count of shortest paths from the center node of a
+minimum spanning tree over the graph.
+"""
 function elongation(g, startidx)
     spaths = dijkstra_shortest_paths(g, startidx)
     @debug "spaths.dists" spaths.dists
-    # remove those annoying Infs that ruin it for everyone else
-    # D = map(v -> clamp(v, eps(), typemax(Float32)), spaths.dists)
-# elongation ratio over the shortest paths from the center node of a
-# minimum spanning tree of the given distance matrix
-    hlen = halflen(spaths.dists)
-    hwid = halfwidth(spaths.dists)
-    hlen = clamp(hlen, eps(), floatmax(Float32))
-    hwid = clamp(hwid, eps(), floatmax(Float32))
+    # remove those annoying zeros and Infs that ruin it for everyone else
+    hlen = clamp(halflen(spaths.dists), eps(), floatmax(Float32))
+    hwid = clamp(halfwidth(spaths.dists), eps(), floatmax(Float32))
     @debug "halflen, halfwidth" hlen hwid
-    return hlen / hwid
+    return hlen / hwid + 1
 end
 
-function _b_d_order(g, minidx)
-    bfsorder = bfs_tree(g, minidx) # BREADTH FIRST: Uses alternate outneighbors implementation; see below
-    dfsorder = dfs_tree(g, minidx) # DEPTH FIRST
-    return bfsorder, dfsorder
-end
+# BREADTH FIRST: Uses alternate outneighbors implementation; see below
+_b_d_order(g, minidx) = (bfs_tree(g, minidx), dfs_tree(g, minidx))
 
 """
 Returns a weighted graph of the MST of the given distance matrix,
@@ -225,19 +232,32 @@ function _mst(dm::AbstractMatrix)
     # By forcing an unsymmetric distance matrix into a Symmetric one
     # we are losing 1/2 (the lower half) of the distances
     # Should we construct a separate graph for the lower half as well?
+
+    map!(v -> v ≈ 0. ? ϵ : v, dm, dm)
     g = issymmetric(dm) ? SimpleWeightedGraph(dm) : SimpleWeightedGraph(Symmetric(dm))
+    @debug "graph from distance matrix ne nv" g ne(g) nv(g)
+    @debug "minimum weight value" minimum(LightGraphs.weights(g))
 
 # Minimum Spanning Tree using the Kruskal algorithm
-    mst = kruskal_mst(g) # vector of Edges
+    mst = kruskal_mst(g; minimize=false) # calculate the maximum tree instead of the minimized version
     @debug "kruskal MST" mst
+    Ii = src.(mst)
+    Ji = dst.(mst)
+    Vi = weight.(mst)
+    @debug "I J V" Ii Ji Vi
+
+    S = sparse(Ii, Ji, Vi, size(dm)...)
+    @debug "big beautiful S symmetric?" S issymmetric(S)
 
 # It really needs to be possible to construct a SWG using an Edge iterator...
-    mstg = SimpleWeightedGraph(length(mst))
-    for e in mst
-        add_edge!(mstg, e)
-    end
-    @debug "weighted graph from DM" mstg
-    mstg
+    # mstg = SimpleWeightedGraph(length(mst))
+    # for e in mst
+    #     add_edge!(mstg, e)
+    # end
+    # @debug "weighted graph from DM ne nv" mstg ne(mstg) nv(mstg) 
+    # mstg
+    g = issymmetric(S) ? SimpleWeightedGraph(S) : SimpleWeightedGraph(Symmetric(S))
+    return SimpleWeightedGraph(g)
 end
 
 
