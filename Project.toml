@@ -21,6 +21,7 @@ SpectralDistances = "2b0dec9d-f767-4f95-9e73-7df56487de68"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+Reexport = "0.2"
 julia = "1"
 
 [extras]
