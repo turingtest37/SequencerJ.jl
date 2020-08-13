@@ -1,41 +1,55 @@
+"""
 
+Constant to use when specifying the Square Euclidean or L2 distance metric for a sequencing run.
 
+    The L2 metric measures the sum of squares of the Euclidean or Manhattan-style 
+    distance between two vectors of values. Because it operates only on values and not 
+    on their underlying grid or axis, the L2 metric is less sensitive to the positions of  
+    values along their grid than the EMD and Energy metrics.
+    ``
+        L2(x,y) = Σ ||x - y||²
+    ``
+See [`Distances.SqEuclidean`](@Ref)
+
+"""
 const L2 = Distances.SqEuclidean()
-const WASS1D = EMD()
 const KLD = Distances.KLDivergence()
+const WASS1D = EMD()
 const ENERGY = Energy()
 const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)
 
-# Smallest weight/distance (instead of 0 or Inf)
+# Smallest allowed weight/distance (instead of 0)
 const ϵ = 1e-6
 
 # dictionaries to hold intermediate results, keyed by (metric, scale)
-# list of elongation and orderings (BFS,DFS), one per Segment
-d_e_o = Dict()
-# elongation and orderings for the cumulated weighted distances
-d_w = Dict()
+EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment
+
+EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
 
 """
-# variables from the python code
-# INPUT
-# self.grid = grid
-# self.objects_list = objects_list
-# self.estimator_list = estimator_list
-# self.scale_list
+    sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
-# OUTPUT
-# self.weighted_elongation_and_sequence_dictionary = None
-# self.final_mst_elongation = None
-# self.final_mst = None
-# self.final_sequence = None
-"""
+    Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
+    each column of data, possibly after dividing the data into smaller row sets. Columns are compared pairwise for each combination 
+    of metric and scale to create a n x n distance matrix
 
+    The paper that describes the Sequencer algorithm and its applications can be found 
+    on Arxiv: [https://arxiv.org/abs/2006.13948].
+    ```
+@misc{baron2020extracting,
+    title={Extracting the main trend in a dataset: the Sequencer algorithm},
+    author={Dalya Baron and Brice Ménard},
+    year={2020},
+    eprint={2006.13948},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    year=2020
+}
+```
 """
-    sequence(A, scales=(1,4), metrics=(:all))
+function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
-documentation
-"""
-function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where T
+    @debug "A scales,metrics,grid" A scales metrics grid
 
     combos = [(m,s) for m in metrics, s in scales]
 
@@ -44,24 +58,16 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 # Each row typically represents a distinct point in time or space where the
 # observed data were captured.
 #
-    @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain NaN or infinite values."
+    @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
     @debug "A " A
 
-    @debug "scales,metrics,grid" scales metrics grid
-    # replace zeros with epsilon (itsy bitsy teeny tiny value)
-# DONE See if this map step can be removed safely. Answer: No, it must remain in place!
-    map!(v->v ≈ 0. ? v+eps() : v, A, A)
+    # replace zeros and Infs with values that work for the math
+    clamp!(A, eps(), typemax(eltype(A)))
 
-    # create a sensible grid if one was not provided
-    if isnothing(grid)
-        grid = float(collect(axes(A,1)))
-    elseif !(eltype(grid) isa AbstractFloat)
-        grid = float(grid)
-    end
-    @assert length(grid) == size(A,1) # down the column...
+    grid = _ensuregrid!(grid, A)
     @debug "grid after creation/floatation" grid
 
     MST_all = []
@@ -72,7 +78,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         # Dijk = Dict{Tuple,Vector{Array{T}}}()
         @info "Metric $(alg) at scale $(s)..."
 
-        S, G = _splitnorm(s, grid, A)
+        S, G = _splitnorm(A, grid, s)
         @debug "S after split" S
 
         Dklms = zeros(size(A,2), size(A,2))
@@ -94,7 +100,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             @debug "Dklm" Dklm
 
             MSTklm = _mst(Dklm) #MST
-            startidx = _startindex(MSTklm)
+            startidx = elong_start_index(MSTklm)
 
             η = elongation(MSTklm, startidx)
             η = isnan(η) || isinf(η) ? typemin(η) : η
@@ -108,9 +114,9 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             @debug "Dklm_e after elongation" Dklm_e
             Dklms .+= Dklm_e
 
-            bfso, dfso = _b_d_order(MSTklm, startidx)
-            @debug "BFS,DFS" bfso dfso
-            push!(orderings, (bfso,dfso))
+            bfso = bfs_tree(MSTklm, startidx)
+            @debug "BFS" bfso
+            push!(orderings, bfso)
         end
 
         if length(Dklms) < 1
@@ -124,16 +130,17 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
         MSTkl = _mst(Dkl)
         @debug ""
         push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
-        stidx = _startindex(MSTkl) # Least central point of averaged MST
+        stidx = elong_start_index(MSTkl) # Least central point of averaged MST
         ηkl = elongation(MSTkl, stidx)
         @debug "elongation of weighted Dkls" ηkl
         push!(η_all, ηkl) # All elongations (1 per alg,s combo)
 
+        # BREADTH FIRST: Uses alternate outneighbors implementation; see below
         BFSkl = bfs_tree(MSTkl, stidx)
 
         # Store these as intermediate results
-        global d_e_o[(alg,s)] = (ηs, orderings)
-        global d_w[(alg,s)] = (ηkl, BFSkl)
+        global EOSeg[(alg,s)] = (ηs, orderings)
+        global EOAlgScale[(alg,s)] = (ηkl, BFSkl)
     end
 
     # Weighted average of all metrics, scales and chunks (klm)
@@ -147,24 +154,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
     # A sparse proximity matrix to be filled with MST elongation-weighted edge
     # distances (which are actually weights as well)
-    P = spzeros(N,N)
-
-    @inbounds for idx in eachindex(MST_all, η_all)
-        g = MST_all[idx]
-        W = LightGraphs.weights(g)
-        η = η_all[idx]
-        for e in edges(g)
-            i,j = src(e),dst(e)
-            d = W[i,j]
-            P[i,j] = P[j,i] += η * 1.0 / d
-        end
-    end
-    # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
-    Ση = sum(η_all)
-    Pw = P / Ση
-    # Put Inf on the 1,1 diagonal to form a true proximity matrix
-    Pw .= sparse(Matrix(Inf*I, size(Pw)...))
-    @debug "Amazing! Pw Pw Pw!" Pw
+    Pw = _weighted_p_matrix(N, MST_all, η_all)
 
     # Invert the proximity matrix to get a final distance matrix, w/ zeros
     # on the diagonal
@@ -175,32 +165,61 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     # final minimum spanning tree for analysis
     MSTD = _mst(D) #MST
     @debug "final MSTD" MSTD
-    stidx = _startindex(MSTD) # Least central point of averaged MST
-    # Here's that elongation thing again...
+    stidx = elong_start_index(MSTD) # Least central point of averaged MST
     ηD = elongation(MSTD, stidx)
     @debug "elongation of MSTD " ηD
 
+    # BREADTH FIRST: Uses alternate outneighbors implementation; see below
     BFSD = bfs_tree(MSTD, stidx)
     @debug "final BFSD" BFSD
 
     return MSTD, ηD, BFSD
 end
 
-"""
-Returns the index of the least central node in the given graph.
-"""
-function _startindex(g)
-    @debug "starting cc calculation for graph $(g)..."
-    cc = closeness_centrality(g) # a vector of measures, one per node in the graph
-    @debug "closeness_centrality for g $(g)" cc
-    _, minidx = findmin(cc) # value and index of minimum val in C
-    return minidx
+""
+function _ensuregrid!(grid, A)::AbstractVector
+    # create a sensible grid if one was not provided
+    if isnothing(grid)
+        grid = float(collect(axes(A,1)))
+    elseif !(eltype(grid) isa AbstractFloat)
+        grid = float(grid)
+    end
+    @assert length(grid) == size(A,1) "Grid length must match dims 1 (row count) of A. Got grid:$(length(grid)) and A:$(size(A,1))"
+    grid
 end
 
+"Create a N x N proximity matrix from weighted edges of the given graph(s). Edge weights are provided as η coefficient(s) >= 1."
+function _weighted_p_matrix(N, graphs, ηs)
+    P = spzeros(N,N)
 
-halflen(paths) = mean(paths)
+# fill the proximity matrix with elongation-weighted reciprocal edge weights, treated as distances.
+    @inbounds for idx in eachindex(graphs, ηs)
+        g = graphs[idx]
+        W = LightGraphs.weights(g)
+        η = ηs[idx]
+        for e in edges(g)
+            i,j = src(e),dst(e)
+            d = W[i,j] # weight as distance
+            # proximity is the inverse of distance
+            P[i,j] = P[j,i] += η * 1.0 / d
+        end
+    end
+    # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
+    Pw = P / sum(ηs)
+    # Put Inf on the 1,1 diagonal to form a true proximity matrix
+    Pw .= sparse(Matrix(Inf*I, size(Pw)...))
 
-halfwidth(paths) = mean(count(v->v==k, paths) for k in unique(paths)) / 2
+    return Pw
+end
+
+"Return the index of the least central node in the given graph."
+elong_start_index(g) = last(findmin(closeness_centrality(g)))
+
+"Return the half-length or mean of the given path lengths (distances)."
+_halflen(paths) = mean(paths)
+
+"Return the half-width or mean count of unique values in the given path lengths."
+_halfwidth(paths) = mean(count(v->v==k, paths) for k in unique(paths)) / 2
 
 """`julia`
 
@@ -214,26 +233,22 @@ function elongation(g, startidx)
     spaths = dijkstra_shortest_paths(g, startidx)
     @debug "spaths.dists" spaths.dists
     # remove those annoying zeros and Infs that ruin it for everyone else
-    hlen = clamp(halflen(spaths.dists), eps(), floatmax(Float32))
-    hwid = clamp(halfwidth(spaths.dists), eps(), floatmax(Float32))
+    hlen = clamp(_halflen(spaths.dists), eps(), floatmax(Float32))
+    hwid = clamp(_halfwidth(spaths.dists), eps(), floatmax(Float32))
     @debug "halflen, halfwidth" hlen hwid
     return hlen / hwid + 1
 end
 
-# BREADTH FIRST: Uses alternate outneighbors implementation; see below
-_b_d_order(g, minidx) = (bfs_tree(g, minidx), dfs_tree(g, minidx))
-
-"""
-Returns a weighted graph of the MST of the given distance matrix,
-calculated using the Kruskal algorithm.
-"""
+"Return a weighted graph of the minimum spanning tree of the given distance matrix,
+calculated using the Kruskal algorithm."
 function _mst(dm::AbstractMatrix)
-    # Construct a graph from the distance matrix.
-    # By forcing an unsymmetric distance matrix into a Symmetric one
-    # we are losing 1/2 (the lower half) of the distances
-    # Should we construct a separate graph for the lower half as well?
 
-    map!(v -> v ≈ 0. ? ϵ : v, dm, dm)
+    # Zeros and Infs mess up the calculations...
+    clamp!(dm, ϵ, typemax(eltype(dm)))
+
+    # By forcing an unsymmetric distance matrix (from KLD and others) into a Symmetric one
+# we are losing 1/2 (the lower half) of the distances
+# TODO Should we construct a separate graph for the lower half as well?
     g = issymmetric(dm) ? SimpleWeightedGraph(dm) : SimpleWeightedGraph(Symmetric(dm))
     @debug "graph from distance matrix ne nv" g ne(g) nv(g)
     @debug "minimum weight value" minimum(LightGraphs.weights(g))
@@ -246,26 +261,18 @@ function _mst(dm::AbstractMatrix)
     Vi = weight.(mst)
     @debug "I J V" Ii Ji Vi
 
+# Populate a distance matrix with the MST nodes and edge weights
     S = sparse(Ii, Ji, Vi, size(dm)...)
     @debug "big beautiful S symmetric?" S issymmetric(S)
 
-# It really needs to be possible to construct a SWG using an Edge iterator...
-    # mstg = SimpleWeightedGraph(length(mst))
-    # for e in mst
-    #     add_edge!(mstg, e)
-    # end
-    # @debug "weighted graph from DM ne nv" mstg ne(mstg) nv(mstg) 
-    # mstg
     g = issymmetric(S) ? SimpleWeightedGraph(S) : SimpleWeightedGraph(Symmetric(S))
     return SimpleWeightedGraph(g)
 end
 
 
-"""
-Calculates a distance matrix for A for the given
-algorithm. The scale and returns a Dictionary of DMs.
-"""
-function _splitnorm(scale, grid, A)
+"Split the given `m x n` matrix and grid into `scale` parts along the column dimension such
+that the resulting matrices (chunks) are approximately of dimension `k x n` where `k ≊ m / scale`"
+function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
     @debug "scale" scale
     @debug "grid" grid
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
@@ -299,48 +306,3 @@ function _splitnorm(scale, grid, A)
 end
 
 
-import LightGraphs: bfs_parents, _bfs_parents
-
-bfs_parents(g::AbstractGraph, s::Integer; dir = :out) =
-    (dir == :out) ?
-    LightGraphs._bfs_parents(g, s, outneighbors_ranked) :
-    LightGraphs._bfs_parents(g, s, inneighbors)
-
-"""
-default order = :desc (highest weighted edges first). Any other value
-means order ascending.
-"""
-function outneighbors_ranked(g, v; order=:asc)
-    alln = collect(outneighbors(g,v))
-    # @show "Before $(alln)"
-    w = LightGraphs.weights(g)
-    T = eltype(w)
-    rw = T[]
-    for n in alln
-        push!(rw, w[v,n])
-    end
-    idx = zeros(Int,length(rw))
-    sortperm!(idx, rw; rev = (order == :desc))
-    return alln[idx]
-end
-
-
-
-########################################################################################################
-        ######### STEP 2: order the spectra based on the different distance matrices, and measure    ###########
-        #########         weights using the MST elongations.                                         ###########
-        #########         Produce weighted distance matrix per scale and estimator.                  ###########
-        ########################################################################################################
-
-
-        ########################################################################################################
-        ######### STEP 3: use the elongations of the weighted distance matrices sequences            ###########
-        #########         to build proximity matrices, then convert them to distance matrices,       ###########
-        #########         and obtain the final BFS and DFS sequences.                                ###########
-        ########################################################################################################
-
-
-        ########################################################################################################
-        ######### STEP 4: save the final BFS and DFS sequences, their final elongation, and          ###########
-        #########         the sparse distance matrix that was used to obtain these.                  ###########
-        ########################################################################################################

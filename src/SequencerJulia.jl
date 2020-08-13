@@ -2,15 +2,15 @@ module SequencerJulia
 
 using Reexport
 @reexport using Distances
-using StatsBase
 using SparseArrays
 using LightGraphs
 using SimpleWeightedGraphs
 using Logging
+using StatsBase: mean, ecdf, ECDF
 using LinearAlgebra: issymmetric, Symmetric, I
-# using Random: shuffle
+import LightGraphs: bfs_parents, _bfs_parents
 
-
+include("bfs.jl")
 include("distancemetrics.jl")
 include("sequencer.jl")
 
@@ -22,7 +22,6 @@ export EMD, Energy
 
 export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
-# temp
-export _splitnorm, _mst, _startindex, elongation, _b_d_order
+export elong_start_index, elongation
 
 end

@@ -4,6 +4,7 @@ authors = ["a5vzener <c.difficile@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 GraphIO = "aa1b3936-2fda-51b9-ab35-c553d3a640a2"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
