@@ -49,9 +49,7 @@ EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weig
 """
 function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
-    @debug "A scales,metrics,grid" A scales metrics grid
-
-    combos = [(m,s) for m in metrics, s in scales]
+    @info "Sequencing data with shape $(size(A)) using metric(s) $(metrics) at scale(s) $(scales)..."
 
 # We need to ensure that A is, or becomes, oriented so that
 # observation data run in columns. Each column is a separate data series.
@@ -62,124 +60,123 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
-    @debug "A " A
 
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
 
     grid = _ensuregrid!(grid, A)
-    @debug "grid after creation/floatation" grid
 
     MST_all = []
     η_all = Float64[]
-    # Dkls = []
-    for (alg,s) in combos
-    # build a master dictionary of distance matrices for all metrics and scales
-        # Dijk = Dict{Tuple,Vector{Array{T}}}()
-        @info "Metric $(alg) at scale $(s)..."
 
-        S, G = _splitnorm(A, grid, s)
-        @debug "S after split" S
+    for k in metrics
+        alg = k
+        for l in scales
 
-        Dklms = zeros(size(A,2), size(A,2))
-        ηs = [] # Elongations per chunk
-        orderings = [] # BFS, DFS orderings per chunk
+            # summary distance matrix for segments
+            Dklms = zeros(size(A,2), size(A,2))
+            # Elongation per chunk
+            ηs = []
+            # BFS orderings per chunk
+            orderings = []
 
-        # Each m row in S contains n segments of data,
-        # one for each of n data series
-        @inbounds for i in eachindex(S, G) # SEGMENTS
-            #convert to a matrix
-            m = S[i] # m is a matrix already
-            localgrid = G[i] # a vector
-            @debug "matrix for distance calcs" m
-            # m = hcat(r...)'
-            if alg in (EMD, Energy)
-                alg = alg((localgrid, localgrid))
+            # split the data and grid into chunks
+            S, G = _splitnorm(A, grid, l)
+
+            # Each m row in S contains n segments of data,
+            # one for each of n data series
+            @inbounds for i in eachindex(S, G)
+
+                # m is a chunk of the input data matrix
+                m = S[i]
+                # local grid with the same dim 1 dimension as m
+                localgrid = G[i] # a vector
+
+                # Some algorithms can be performed on arbitrary real-valued grids
+                if alg in (EMD, Energy)
+                    alg = alg((localgrid, localgrid))
+                end
+
+                # All the heavy lifting happens here, in the distance calculations
+                Dklm = abs.(pairwise(alg, m; dims = 2)) .+ ϵ
+
+                # Find the minimum spanning tree of the distance matrix
+                MSTklm = _mst(Dklm) #MST
+
+                # Use closeness centrality to find a starting point for graph walks
+                startidx = elong_start_index(MSTklm)
+
+                # half len / half width + 1
+                η = elongation(MSTklm, startidx)
+
+                # weight the distance matrix by its elongation factor
+                Dklm_e = η .* Dklm
+
+                # ensure we stay on the playing field...
+                clamp!(Dklm_e, eps(), typemax(eltype(Dklm_e)))
+                
+                # update the summary matrix
+                Dklms .+= Dklm_e
+
+                # do a breadth-first search on the segment/chunk MST to get a local optimal sequence
+                bfso = bfs_tree(MSTklm, startidx)
+
+                push!(ηs, η)
+                push!(orderings, bfso)
             end
-            Dklm = abs.(pairwise(alg, m; dims = 2)) .+ ϵ
-            @debug "Dklm" Dklm
 
-            MSTklm = _mst(Dklm) #MST
-            startidx = elong_start_index(MSTklm)
+            if length(Dklms) < 1
+                @warn("Unable to create distance matrices from the given data.")
+                return nothing
+            end
 
-            η = elongation(MSTklm, startidx)
-            η = isnan(η) || isinf(η) ? typemin(η) : η
-            @debug "elongation for Dklm" η
-            push!(ηs, η)
+            # Do the same MST-based operations over the weighted per-segment results
+            Dkl = Dklms / sum(ηs) # Weighted average over all chunks for <alg,s>
+            MSTkl = _mst(Dkl)
+            stidx = elong_start_index(MSTkl) # Least central point of averaged MST
+            ηkl = elongation(MSTkl, stidx)
+            BFSkl = bfs_tree(MSTkl, stidx)
 
-# weight the distance matrix by its elongation factor
-            Dklm_e = η .* Dklm
-            clamp!(Dklm_e, eps(), typemax(eltype(Dklm_e)))
-            # map!(v -> isinf(v) ? typemax(v) : v, , Dklm_e)
-            @debug "Dklm_e after elongation" Dklm_e
-            Dklms .+= Dklm_e
+            # Store these as intermediate results
+            push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
+            push!(η_all, ηkl) # All elongations (1 per alg,s combo)
+            global EOSeg[(alg,l)] = (ηs, orderings)
+            global EOAlgScale[(alg,l)] = (ηkl, BFSkl)
 
-            bfso = bfs_tree(MSTklm, startidx)
-            @debug "BFS" bfso
-            push!(orderings, bfso)
+            @info "$(k) at scale $(l): η = $(ηkl)"
+
         end
-
-        if length(Dklms) < 1
-            @warn("Unable to create distance matrices from the given data.")
-            return nothing
-        end
-
-        @debug "Dklms after accumulation" Dklms
-        Dkl = Dklms / sum(ηs) # Weighted average over all chunks for <alg,s>
-        @debug "elongation-weighted Dkl" Dkl
-        MSTkl = _mst(Dkl)
-        @debug ""
-        push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
-        stidx = elong_start_index(MSTkl) # Least central point of averaged MST
-        ηkl = elongation(MSTkl, stidx)
-        @debug "elongation of weighted Dkls" ηkl
-        push!(η_all, ηkl) # All elongations (1 per alg,s combo)
-
-        # BREADTH FIRST: Uses alternate outneighbors implementation; see below
-        BFSkl = bfs_tree(MSTkl, stidx)
-
-        # Store these as intermediate results
-        global EOSeg[(alg,s)] = (ηs, orderings)
-        global EOAlgScale[(alg,s)] = (ηkl, BFSkl)
     end
 
-    # Weighted average of all metrics, scales and chunks (klm)
-    # Dall = sum(Dkls, dims=3) / sum(η_all)
-    # @debug Dall
-    # Dall seems not to be used by the rest of the algorithm!!
+    # Now use the accumulated MSTs and elongations to create a final N x N proximity matrix
 
-    # N = maximum(nv.(MST_all)) # vector of Graphs
-    # @debug "maximum of nv.(MST_all)" N
+    # nb of columns in A
     N = size(A,2)
-
-    # A sparse proximity matrix to be filled with MST elongation-weighted edge
+    # Pw is a sparse proximity matrix to be filled with MST elongation-weighted edge
     # distances (which are actually weights as well)
     Pw = _weighted_p_matrix(N, MST_all, η_all)
-
-    # Invert the proximity matrix to get a final distance matrix, w/ zeros
-    # on the diagonal
-    D = similar(Pw)
-    D .= 1 ./ Pw
-    @debug "D" D
-
+    # Invert the proximity matrix to get a final distance matrix
+    # w/ zeros on the diagonal
+    D = inv.(Pw)
     # final minimum spanning tree for analysis
     MSTD = _mst(D) #MST
-    @debug "final MSTD" MSTD
     stidx = elong_start_index(MSTD) # Least central point of averaged MST
-    ηD = elongation(MSTD, stidx)
-    @debug "elongation of MSTD " ηD
 
-    # BREADTH FIRST: Uses alternate outneighbors implementation; see below
+    # final elongation
+    ηD = elongation(MSTD, stidx)
+
+    # final optimal data sequence
     BFSD = bfs_tree(MSTD, stidx)
-    @debug "final BFSD" BFSD
+
+    @info "Final average elongation: $(ηD)"
 
     return MSTD, ηD, BFSD
 end
 
-""
+"Ensure the grid is compatible with the data. Create a grid if one was not provided."
 function _ensuregrid!(grid, A)::AbstractVector
-    # create a sensible grid if one was not provided
     if isnothing(grid)
+        # create a sensible grid if one was not provided
         grid = float(collect(axes(A,1)))
     elseif !(eltype(grid) isa AbstractFloat)
         grid = float(grid)
@@ -188,7 +185,9 @@ function _ensuregrid!(grid, A)::AbstractVector
     grid
 end
 
-"Create a N x N proximity matrix from weighted edges of the given graph(s). Edge weights are provided as η coefficient(s) >= 1."
+
+"Create a N x N proximity matrix from weighted edges of the given graph(s).
+Edge weights are provided as η coefficient(s) >= 1."
 function _weighted_p_matrix(N, graphs, ηs)
     P = spzeros(N,N)
 
@@ -207,7 +206,7 @@ function _weighted_p_matrix(N, graphs, ηs)
     # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
     Pw = P / sum(ηs)
     # Put Inf on the 1,1 diagonal to form a true proximity matrix
-    Pw .= sparse(Matrix(Inf*I, size(Pw)...))
+    Pw .+= sparse(Matrix(Inf*I, size(Pw)...))
 
     return Pw
 end
@@ -231,11 +230,9 @@ minimum spanning tree over the graph.
 """
 function elongation(g, startidx)
     spaths = dijkstra_shortest_paths(g, startidx)
-    @debug "spaths.dists" spaths.dists
     # remove those annoying zeros and Infs that ruin it for everyone else
     hlen = clamp(_halflen(spaths.dists), eps(), floatmax(Float32))
     hwid = clamp(_halfwidth(spaths.dists), eps(), floatmax(Float32))
-    @debug "halflen, halfwidth" hlen hwid
     return hlen / hwid + 1
 end
 
@@ -250,10 +247,8 @@ function _mst(dm::AbstractMatrix)
 # we are losing 1/2 (the lower half) of the distances
 # TODO Should we construct a separate graph for the lower half as well?
     g = issymmetric(dm) ? SimpleWeightedGraph(dm) : SimpleWeightedGraph(Symmetric(dm))
-    @debug "graph from distance matrix ne nv" g ne(g) nv(g)
-    @debug "minimum weight value" minimum(LightGraphs.weights(g))
 
-# Minimum Spanning Tree using the Kruskal algorithm
+    # Minimum Spanning Tree using the Kruskal algorithm
     mst = kruskal_mst(g; minimize=false) # calculate the maximum tree instead of the minimized version
     @debug "kruskal MST" mst
     Ii = src.(mst)
