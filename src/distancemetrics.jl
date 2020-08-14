@@ -88,6 +88,18 @@ distributions u et v. With dimension parameter p = 1,
 the distance is the 1 Wasserstein (or Earth Mover's) Distance.
 With p=2, the distance is Energy.
 
+References (from the stats.py source code)
+    ----------
+    [1] "Energy distance", https://en.wikipedia.org/wiki/Energy_distance
+    [2] Szekely "E-statistics: The energy of statistical samples." Bowling
+        Green State University, Department of Mathematics and Statistics,
+        Technical Report 02-16 (2002).
+    [3] Rizzo, Szekely "Energy distance." Wiley Interdisciplinary Reviews:
+        Computational Statistics, 8(1):27-38 (2015).
+    [4] Bellemare, Danihelka, Dabney, Mohamed, Lakshminarayanan, Hoyer,
+        Munos "The Cramer Distance as a Solution to Biased Wasserstein
+        Gradients" (2017). :arXiv:`1705.10743`.
+
 """
 function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 

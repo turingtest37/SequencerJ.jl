@@ -64,7 +64,6 @@
             @test Energy(objs[1], objs[2]) !== nothing
         end
 
-
         @testset "energy() not null" begin
             objs = [[3.4, 3.9, 7.5, 7.8], [4.5, 1.4],
             [1.4, 0.9, 3.1, 7.2], [3.2, 3.5]]
@@ -72,8 +71,13 @@
             @test energy(objs...) !== nothing
         end
 
+        @testset "Energy() produces same result as python, simple." begin
+            objs = ([0, 8], [0, 8], [3, 1], [2, 2])
+            expected = 1.0
+            @test Energy()(objs...) ≈ expected
+        end
 
-        @testset "Energy() produces same result as python" begin
+        @testset "Energy() produces same result as python, harder." begin
             objs = [[3.4, 3.9, 7.5, 7.8], [4.5, 1.4],
             [1.4, 0.9, 3.1, 7.2], [3.2, 3.5]]
             expected = 2.3674181638546394
