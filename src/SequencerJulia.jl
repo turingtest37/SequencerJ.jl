@@ -1,11 +1,12 @@
 module SequencerJulia
 
+using Logging
+using Printf: @sprintf
 using Reexport
 @reexport using Distances
-using SparseArrays
+using SparseArrays: sparse, spzeros
 using LightGraphs
 using SimpleWeightedGraphs
-using Logging
 using StatsBase: mean, ecdf, ECDF
 using LinearAlgebra: issymmetric, Symmetric, I
 import LightGraphs: bfs_parents, _bfs_parents

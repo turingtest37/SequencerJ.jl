@@ -8,7 +8,9 @@ SMALL = convert(Matrix{Float32}, float32.(Gray.(imgsmall)))
 
 
 I = shuffle(axes(SMALL,2))
-imgshuffled = SMALL[:,I];
+imgshuffled = SMALL[:,I]
+RGB.(imgshuffled)
+
 MSTD, ηD, BFSD = sequence(imgshuffled; scales=(4), metrics=ALL_METRICS)
 II = collect(vertices(BFSD))
 res = SMALL[:,II]

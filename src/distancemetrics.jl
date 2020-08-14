@@ -1,11 +1,22 @@
+"Smallest allowed graph weight/distance (instead of 0, which does not play well with sparse graphs.)"
+const ϵ = 1e-6
 
+# ******** EMD *********
+
+"""
+
+Monge-Wasserstein or 1-p Wasserstein or Earth Mover's Distance.
+
+"""
 struct EMD <: SemiMetric
     grids::Union{Nothing,Tuple}
 end
 
+"Default constructor with no grid provided."
 EMD() = EMD(nothing)
+
 """
-Returns fhe Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
+Calculate the Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
 between the two given vectors (which are treated as weights on a grid
 defined by the first axis of u).
 """
@@ -34,11 +45,6 @@ emd(u,v,uw,vw) = EMD(u,v,uw,vw)
 
 
 # ******** ENERGY *********
-# To get distance matrix, use pairwise(Energy(), A, dims=[1|2])
-# A has to be a Matrix. Use dims to indicate direction of columns
-# A = hcat(objs...)'
-# @debug "A" A
-# return pairwise(Energy(), A, dims=1)
 
 struct Energy <: SemiMetric
     grids::Union{Nothing,Tuple}
@@ -66,11 +72,16 @@ function Energy(u,v)
     Energy(gridu,gridv,u,v)
 end
 
+"""
+Convenience function for Energy with a supplied grid.
+"""
 energy(u, v, uw, vw) = Energy(u, v, uw, vw)
 
+"""
+Convenience function for Energy with a default unit grid.
+"""
 energy(u::AbstractVector, v=u) = Energy(u,v)
 
-# TODO Upgrade to EmpiricalCDF package instead of StatsBase.ECDF
 """
 Returns the statistical distance between two cumulative
 distributions u et v. With dimension parameter p = 1,
@@ -92,12 +103,10 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
     Δx = diff(uplusv, dims = 1)
     @debug "Delta Force!" Δx
 
-# shortcut return in case the grids are identical
-# Just return the sum of differences across the two CDFs
-# TODO: Make the shortcut work with non-unit grids
+# Shortcut return in case the grids are identical
     if uv == vv # we can safely remove zeros from the delta
         Δx = filter(v->!iszero(v), Δx)
-        UA = u(uv) # calculate u,v CDFs separately
+        UA = u(uv) # calculate u,v CDFs on their separate grids
         VA = v(vv)
     else
         A = uplusv[1:end-1]
@@ -105,7 +114,6 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
         UA = u(A) # Calculate CDFs on whole domain
         VA = v(A)
     end
-    @debug "Δx UA VA" Δx UA VA
 
     if p == 1
         return sum(abs.(UA .- VA) .* Δx)
@@ -115,3 +123,39 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
         return sum(abs.((UA .- VA)) .^ p .* Δx) ^ 1/p
     end
 end
+
+# *********** CONSTANTS ************
+
+"""
+Constant to use when specifying the Square Euclidean or L2 distance metric for a sequencing run.
+
+    The L2 metric measures the sum of squares of the Euclidean or Manhattan-style 
+    distance between two vectors of values. Because it operates only on values and not 
+    on their underlying grid or axis, the L2 metric is less sensitive to the positions of  
+    values along their grid than the EMD and Energy metrics.
+    ``
+        L2(x,y) = Σ ||x - y||²
+    ``
+See [`Distances.SqEuclidean`](@Ref)
+
+"""
+const L2 = Distances.SqEuclidean()
+
+"""
+Kullbach-Leibler Divergence metric.
+"""
+const KLD = Distances.KLDivergence()
+
+"""
+Monge-Wasserstein a.k.a. 1-p Wasserstein a.k.a. Earth Mover's Distance (EMD) metric. Sensitive to underlying 
+grid. Default is unit grid taken from the axes of the data vector.
+"""
+const WASS1D = EMD()
+
+"""
+#TODO Fix this comment. Energy metric as defined by Szkely. (CHECK)
+"""
+const ENERGY = Energy()
+
+"Convenience constant to represent L2, WASS1D, KLD, and ENERGY."
+const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)
