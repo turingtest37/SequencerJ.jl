@@ -165,7 +165,9 @@ grid. Default is unit grid taken from the axes of the data vector.
 const WASS1D = EMD()
 
 """
-#TODO Fix this comment. Energy metric as defined by Szkely. (CHECK)
+#TODO Fix this comment. Energy metric as defined by Szekely. (CHECK)
+
+[wikipedia article](https://en.wikipedia.org/wiki/Energy_distance)
 """
 const ENERGY = Energy()
 

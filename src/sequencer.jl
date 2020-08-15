@@ -1,3 +1,13 @@
+
+struct SequencerResult
+
+
+    
+
+
+end
+
+
 """
     sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
@@ -109,7 +119,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             global EOSeg[(alg,l)] = (ηs, orderings)
             global EOAlgScale[(alg,l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%g", ηkl))"
+            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl))"
 
         end
     end
@@ -124,7 +134,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     # final minimum spanning tree for analysis
     MSTD, ηD, BFSD = _measure_dm(D)
 
-    @info "Final average elongation: $(@sprintf("%g", ηD))"
+    @info "Final average elongation: $(@sprintf("%.4g", ηD))"
 
     return MSTD, ηD, BFSD
 end
@@ -235,15 +245,15 @@ function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
     chunklen = cld(M, scale)
     slices=[]
     grids=[]
-    chunkrange = 1:chunklen:M # the starting indices for each chunk
+    chunkstrt = 1:chunklen:M # the starting indices for each chunk
 
-    for i in chunkrange
-        ii = i + chunklen - 1 # the end index for the chunk
-        ii = clamp(ii, 1, M)  # keepin' it real....
+    for i in chunkstrt
+        ii = i + chunklen - one(i) # the end index for the chunk
+        ii = clamp(ii, one(ii), M)  # keepin' it real....
         S = A[i:ii, :] # a subset of rows, all columns
         G = grid[i:ii]
         # now normalize each column of the slice
-        Σslice = sum(S, dims=1)
+        Σslice = sum(S, dims = 1)
         push!(slices, S ./ Σslice)
         push!(grids, G)
     end
