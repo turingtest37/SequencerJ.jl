@@ -7,7 +7,7 @@ Using SequencerJulia is easy:
 ```
 jldoctest
 
-using Pkg; Pkg.add("https://github.com/turingtest37/SequencerJulia.jl/")
+using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJulia.jl/"))
 
 using SequencerJulia
 

@@ -1,4 +1,9 @@
+"""
 
+Contains the results of a Sequencer run. Use the returned object to obtain details
+about the run results.
+
+"""
 struct SequencerResult
     EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
     EOAlgScale::Dict{Tuple,Any} # elongation and orderings for the cumulated weighted distances
