@@ -1,11 +1,23 @@
 
 struct SequencerResult
-
-
-    
-
-
+    EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
+    EOAlgScale::Dict{Tuple,Any} # elongation and orderings for the cumulated weighted distances
+    fD::AbstractMatrix
+    ftree::LightGraphs.AbstractGraph
+    fη::Real
+    ford::AbstractVector        
 end
+
+dm(r::SequencerResult) = r.fD
+
+mst(r::SequencerResult) = r.ftree
+
+elong(r::SequencerResult) = r.fη
+
+order(r::SequencerResult) = r.ford
+
+import Base: show
+show(io::IO, s::SequencerResult) = println(io, "Sequencer Result: η = $(@sprintf("%.4g", s.fη)), order = $(s.ford) ")
 
 
 """
@@ -60,6 +72,8 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
     MST_all = []
     η_all = []
+    EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment    
+    EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
 
     @inbounds for k in metrics
         alg = k
@@ -116,8 +130,8 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             # Store these as intermediate results
             push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
             push!(η_all, ηkl) # All elongations (1 per alg,s combo)
-            global EOSeg[(alg,l)] = (ηs, orderings)
-            global EOAlgScale[(alg,l)] = (ηkl, BFSkl)
+            EOSeg[(alg,l)] = (ηs, orderings)
+            EOAlgScale[(alg,l)] = (ηkl, BFSkl)
 
             @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl))"
 
@@ -136,7 +150,7 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
 
     @info "Final average elongation: $(@sprintf("%.4g", ηD))"
 
-    return MSTD, ηD, BFSD
+    return SequencerResult(EOSeg, EOAlgScale, D, MSTD, ηD, collect(vertices(BFSD)))
 end
 
 

@@ -11,7 +11,7 @@ I = shuffle(axes(SMALL,2))
 imgshuffled = SMALL[:,I]
 RGB.(imgshuffled)
 
-MSTD, ηD, BFSD = sequence(imgshuffled; scales=(4), metrics=ALL_METRICS)
-II = collect(vertices(BFSD))
+res = sequence(imgshuffled; scales=(4), metrics=ALL_METRICS)
+II = order(res)
 res = SMALL[:,II]
 Gray.(res)

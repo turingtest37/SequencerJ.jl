@@ -21,10 +21,10 @@ SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpectralDistances = "2b0dec9d-f767-4f95-9e73-7df56487de68"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 BenchmarkTools = "0.5"
-Distances = "0.9"
 GraphIO = "0.5"
 ImageIO = "0.3"
 Images = "0.22"

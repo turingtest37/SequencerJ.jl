@@ -23,6 +23,7 @@ export EMD, Energy
 
 export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
-export elong_start_index, elongation
+export elong_start_index, elongation, dm, mst, elong, order
+
 
 end
