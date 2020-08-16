@@ -24,6 +24,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 BenchmarkTools = "0.5"
+Distances = "0.9"
 GraphIO = "0.5"
 ImageIO = "0.3"
 Images = "0.22"
