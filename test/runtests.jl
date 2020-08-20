@@ -34,12 +34,15 @@ using Images
         @test sequence(BIG; scales=[2], metrics=(KLD, WASS1D)) !== nothing
     end
 
+    loss(A,B) = L2(A, B)
+
     @testset "reorder small image" begin
         Idx = shuffle(axes(SMALL,2))
         imgshuff = SMALL[:,Idx]
         seqres = sequence(imgshuff; scales=(1), metrics=(KLD, WASS1D))
         ind = order(seqres)
         res = imgshuff[:, ind]
+        println("loss=$(loss(SMALL,res))")
         @test SMALL == res
     end
 
