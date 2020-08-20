@@ -155,7 +155,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             EOSeg[(alg, l)] = (ηs, orderings)
             EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(tt)s)"        
+            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
         end
     end
 

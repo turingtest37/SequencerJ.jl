@@ -6,16 +6,20 @@ using LightGraphs
 using Images
 
 @testset "SequencerJulia.jl" begin
-    imgsmall = load(joinpath(@__DIR__,"..","resources","colony.png"))
-    SMALL = convert(Matrix{Float32}, float32.(Gray.(imgsmall)))
-
-    imgmed = load(joinpath(@__DIR__,"..","resources","Aged Whisky.jpg"));
-    MED = convert(Matrix{Float32}, float32.(Gray.(imgmed)))
-
-    imgbig = load(joinpath(@__DIR__,"..","resources","Hummingbird!.jpeg"))
-    BIG = convert(Matrix{Float32}, float32.(Gray.(imgbig)))
 
     include("algotests.jl")
+
+    # declare a loss function to measure the error in calculations
+    loss(A,B) = L2(A, B)
+
+    imgsmall = Gray.(load(joinpath(@__DIR__,"..","resources","colony.png")))
+    SMALL = convert(Matrix{Float32}, float32.(imgsmall))
+
+    imgmed = Gray.(load(joinpath(@__DIR__,"..","resources","Aged Whisky.jpg")));
+    MED = convert(Matrix{Float32}, float32.(imgmed))
+
+    imgbig = Gray.(load(joinpath(@__DIR__,"..","resources","Hummingbird!.jpeg")))
+    BIG = convert(Matrix{Float32}, float32.(imgbig))
 
     @testset "real image does not fail." begin
         @test sequence(SMALL; scales=[2]) !== nothing
@@ -33,34 +37,55 @@ using Images
         @test sequence(BIG; scales=[2], metrics=(KLD, WASS1D)) !== nothing
     end
 
-    loss(A,B) = L2(A, B)
-
     @testset "reorder small image" begin
         Idx = shuffle(axes(SMALL,2))
         imgshuff = SMALL[:,Idx]
-        seqres = sequence(imgshuff; scales=(1), metrics=(KLD, WASS1D))
+        seqres = sequence(imgshuff; scales=(1)) #all metrics
         ind = order(seqres)
         res = imgshuff[:, ind]
-        println("loss=$(loss(SMALL,res))")
+        @show loss(SMALL,res)
         @test SMALL == res
     end
 
-    @testset "reorder med image" begin
+    @testset "reorder med image, orig. portrait" begin
         Idx = shuffle(axes(MED,2))
         imgshuff = MED[:,Idx]
-        seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, WASS1D))
+        seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2))
         ind = order(seqres)
         res = imgshuff[:, ind]
+        @show loss(MED,res)
         @test MED == res
     end
 
-    @testset "reorder large image" begin
-        Idx = shuffle(axes(BIG,2))
-        imgshuff = BIG[:,Idx]
-        seqres = sequence(imgshuff; scales=(1,2,4), metrics=(KLD, WASS1D))
+    @testset "reorder med image, landscape" begin
+        MED = permutedims(MED)
+        Idx = shuffle(axes(MED,2))
+        imgshuff = MED[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2))
         ind = order(seqres)
         res = imgshuff[:, ind]
+        @show loss(MED,res)
+        @test MED == res
+    end
+
+    @testset "reorder large image, orig. landscape" begin
+        Idx = shuffle(axes(BIG,2))
+        imgshuff = BIG[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD))
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @show loss(BIG,res)
         @test BIG == res
     end
 
+    @testset "reorder large image, portrait" begin
+        BIG = permutedims(BIG)
+        Idx = shuffle(axes(BIG,2))
+        imgshuff = BIG[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD))
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @show loss(BIG,res)
+        @test BIG == res
+    end
 end
