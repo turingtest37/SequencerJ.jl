@@ -6,7 +6,6 @@ using LightGraphs
 using Images
 
 @testset "SequencerJulia.jl" begin
-    # Write your tests here.
     imgsmall = load(joinpath(@__DIR__,"..","resources","colony.png"))
     SMALL = convert(Matrix{Float32}, float32.(Gray.(imgsmall)))
 

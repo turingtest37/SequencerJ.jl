@@ -101,6 +101,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     @inbounds for k in metrics
         alg = k
         for l in scales
+
             # summary distance matrix for segments
             Dklms = zeros(N, N)
             # Elongation per chunk
@@ -112,7 +113,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
-            for i in eachindex(S, G)
+            tt = @elapsed for i in eachindex(S, G)
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
                 m, lgrid = S[i], G[i]
@@ -154,7 +155,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             EOSeg[(alg, l)] = (ηs, orderings)
             EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl))"        
+            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(tt)s)"        
         end
     end
 
@@ -241,8 +242,8 @@ Returns the ratio of the graph half-length (mean of path distances) over the
 half-width, defined as the mean count of shortest paths from the center node of a
 minimum spanning tree over the graph.
 """
-function elongation(g, startidx)
-    spaths = dijkstra_shortest_paths(g, startidx)
+function elongation(G, startidx)
+    spaths = dijkstra_shortest_paths(G, startidx, LightGraphs.DefaultDistance())
     # remove those annoying zeros and Infs that ruin it for everyone else
     hlen = clamp(_halflen(spaths.dists), eps(), floatmax(Float32))
     hwid = clamp(_halfwidth(spaths.dists), eps(), floatmax(Float32))
