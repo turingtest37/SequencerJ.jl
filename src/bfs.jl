@@ -14,14 +14,15 @@ ranked by edge weight (ascending by default).
 """
 function outneighbors_ranked(g, v; order=:asc)
     alln = collect(outneighbors(g,v))
-    # @show "Before $(alln)"
-    w = LightGraphs.weights(g)
-    T = eltype(w)
+    length(alln) == 1 && return alln
+    W = LightGraphs.weights(g)
+    T = eltype(W)
     rw = T[]
     for n in alln
-        push!(rw, w[v,n])
+        w = W[v,n]
+        push!(rw, w)
     end
-    idx = zeros(Int,length(rw))
+    idx = Array{Int}(undef, length(rw))
     sortperm!(idx, rw; rev = (order == :desc))
     return alln[idx]
 end

@@ -1,28 +1,42 @@
 """
-
 Contains the results of a Sequencer run. Use the returned object to obtain details
-about the run results.
+about the run results by calling the appropriate function.
+
+```
+jldoctest
+
+julia> r = sequence(A; metrics=ALL_METRICS, scales=(1,2,4))
+┌ Info: Sequencing data with
+│     shape: (50, 100)
+│     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+└     scale(s): (1, 2, 4)
+[...]
+julia> elong(r)
+1.3611293865541154e37
+
+julia> order(r)
+100-element Array{Int64,1}:
+[...]
+
+```
 
 """
 struct SequencerResult
     EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
     EOAlgScale::Dict{Tuple,Any} # elongation and orderings for the cumulated weighted distances
-    fD::AbstractMatrix
-    ftree::LightGraphs.AbstractGraph
-    fη::Real
-    ford::AbstractVector        
+    D::AbstractMatrix # final distance matrix
+    mst::LightGraphs.AbstractGraph # final mst
+    η::Real # final elongation
+    order::AbstractVector #final ordering from bfs
 end
 
-dm(r::SequencerResult) = r.fD
-
-mst(r::SequencerResult) = r.ftree
-
-elong(r::SequencerResult) = r.fη
-
-order(r::SequencerResult) = r.ford
+D(r::SequencerResult) = r.D
+mst(r::SequencerResult) = r.mst
+elong(r::SequencerResult) = r.η
+order(r::SequencerResult) = r.order
 
 import Base: show
-show(io::IO, s::SequencerResult) = println(io, "Sequencer Result: η = $(@sprintf("%.4g", s.fη)), order = $(s.ford) ")
+show(io::IO, s::SequencerResult) = println(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
 
 
 """
@@ -48,10 +62,10 @@ show(io::IO, s::SequencerResult) = println(io, "Sequencer Result: η = $(@sprint
 
 ```jldoctest```
 
-
+TODO Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
 """
-function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
+function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
@@ -67,8 +81,12 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
 
+    # repackage any given iterator into a tuple
+    metrics = tuple(metrics...)
+    scales = tuple(scales...)
+
     # nb of columns in A
-    N = size(A,2)
+    N = size(A, 2)
 
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
@@ -83,7 +101,6 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     @inbounds for k in metrics
         alg = k
         for l in scales
-
             # summary distance matrix for segments
             Dklms = zeros(N, N)
             # Elongation per chunk
@@ -97,26 +114,23 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             # one for each of n data series
             for i in eachindex(S, G)
                 # m is a chunk of the input data matrix
-                m = S[i]
                 # local grid with the same dim 1 dimension as m
-                localgrid = G[i] # a vector
-
+                m, lgrid = S[i], G[i]
                 # Some algorithms can be performed on arbitrary real-valued grids
                 if alg in (EMD, Energy)
-                    alg = alg((localgrid, localgrid))
+                    alg = alg((lgrid, lgrid))
                 end
-
                 # All the heavy lifting happens here, in the distance calculations
-                Dklm = abs.(pairwise(alg, m; dims = 2)) .+ ϵ
+                Dklm = abs.(pairwise(alg, m; dims=2)) .+ ϵ
                 # Measure our per-metric, per-scale, per-segment distance matrix
-                MSTklm, η, bfso = _measure_dm(Dklm)
+                MSTklm, _, η, bfso = _measure_dm(Dklm)
                 # weight the distance matrix by its elongation factor
                 Dklm_e = η .* Dklm
                 # ensure we stay on the playing field...
                 clamp!(Dklm_e, eps(), typemax(eltype(Dklm_e)))
                 # update the summary matrix
                 Dklms .+= Dklm_e
-
+                # save it for later...don't run away and let me down
                 push!(ηs, η)
                 push!(orderings, bfso)
             end
@@ -129,17 +143,18 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
             # Perform the same MST-based analysis on the weighted results over all segments
             Dkl = Dklms / sum(ηs)
 
-            # per-metric, per-scale average distance matrix
-            MSTkl, ηkl, BFSkl = _measure_dm(Dkl)
+            # measure the per-metric, per-scale average distance matrix
+            # minimum spanning tree, elongation, and the breadth-first search tree
+            MSTkl, _, ηkl, BFSkl = _measure_dm(Dkl)
 
-            # Store these as intermediate results
             push!(MST_all, MSTkl) # All MSTs (1 per alg,s combo)
             push!(η_all, ηkl) # All elongations (1 per alg,s combo)
-            EOSeg[(alg,l)] = (ηs, orderings)
-            EOAlgScale[(alg,l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl))"
+            # Store these as intermediate results
+            EOSeg[(alg, l)] = (ηs, orderings)
+            EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
+            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl))"        
         end
     end
 
@@ -149,13 +164,16 @@ function sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothin
     # Invert the proximity matrix to get a final distance matrix
     # w/ zeros on the diagonal
     D = inv.(Pw)
-
     # final minimum spanning tree for analysis
-    MSTD, ηD, BFSD = _measure_dm(D)
-
+    mstD, stidx, ηD, bfstD = _measure_dm(D)
     @info "Final average elongation: $(@sprintf("%.4g", ηD))"
-
-    return SequencerResult(EOSeg, EOAlgScale, D, MSTD, ηD, collect(vertices(BFSD)))
+    # convert the final sequence from tree form into an ordered vector of vertices.
+    order = unroll(bfstD, stidx)
+    # head = round.(collect(order[1:5]); digits=2)
+    # tail = round.(collect(order[end-5:end]); digits=2)
+    # s = join(string(head),",") * "..." * join(string(tail),",") 
+    @info "Final ordering: $(order)"
+    return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order)
 end
 
 
@@ -165,8 +183,8 @@ function _measure_dm(D::AbstractMatrix)
     g = _mst(D) # minimum spanning tree for D
     stidx = elong_start_index(g) # Least central point of MST
     η = elongation(g, stidx)
-    order = bfs_tree(g, stidx)
-    return g, η, order
+    bfst = bfs_tree(g, stidx)
+    return g, stidx, η, bfst
 end
 
 
@@ -174,11 +192,11 @@ end
 function _ensuregrid!(grid, A)::AbstractVector
     if isnothing(grid)
         # create a sensible grid if one was not provided
-        grid = float(collect(axes(A,1)))
+        grid = float(collect(axes(A, 1)))
     elseif !(eltype(grid) isa AbstractFloat)
         grid = float(grid)
     end
-    @assert length(grid) == size(A,1) "Grid length must match dims 1 (row count) of A. Got grid:$(length(grid)) and A:$(size(A,1))"
+    @assert length(grid) == size(A, 1) "Grid length must match dims 1 (row count) of A. Got grid:$(length(grid)) and A:$(size(A, 1))"
     grid
 end
 
@@ -186,15 +204,14 @@ end
 "Create a N x N proximity matrix from weighted edges of the given graph(s).
 Edge weights are provided as η coefficient(s) >= 1."
 function _weighted_p_matrix(N, graphs, ηs)
-    P = spzeros(N,N)
-
+    P = spzeros(N, N)
 # fill the proximity matrix with elongation-weighted reciprocal edge weights, treated as distances.
     @inbounds for idx in eachindex(graphs, ηs)
         g = graphs[idx]
         W = LightGraphs.weights(g)
         η = ηs[idx]
         for e in edges(g)
-            i,j = src(e),dst(e)
+            i, j = src(e), dst(e)
             d = W[i,j] # weight as distance
             # proximity is the inverse of distance
             P[i,j] = P[j,i] += η * 1.0 / d
@@ -203,8 +220,7 @@ function _weighted_p_matrix(N, graphs, ηs)
     # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.
     Pw = P / sum(ηs)
     # Put Inf on the 1,1 diagonal to form a true proximity matrix
-    Pw .+= sparse(Matrix(Inf*I, size(Pw)...))
-
+    Pw .+= sparse(Matrix(Inf * I, size(Pw)...))
     return Pw
 end
 
@@ -215,7 +231,7 @@ elong_start_index(g) = last(findmin(closeness_centrality(g)))
 _halflen(paths) = mean(paths)
 
 "Return the half-width or mean count of unique values in the given path lengths."
-_halfwidth(paths) = mean(count(v->v==k, paths) for k in unique(paths)) / 2
+_halfwidth(paths) = mean(count(v -> v == k, paths) for k in unique(paths)) / 2
 
 """`julia`
 
@@ -241,9 +257,10 @@ function _mst(dm::AbstractMatrix)
     # By forcing an unsymmetric distance matrix (from KLD and others) into a Symmetric one
 # we are losing 1/2 (the lower half) of the distances
 # TODO Should we construct a separate graph for the lower half as well?
-    g = issymmetric(dm) ? SimpleWeightedGraph(dm) : SimpleWeightedGraph(Symmetric(dm))
+# TODO Ask Dalya about this
+    g = SimpleWeightedGraph(issymmetric(dm) ? dm : Symmetric(dm))
 # Minimum Spanning Tree using the Kruskal algorithm
-    mst = kruskal_mst(g; minimize=false) # calculate the maximum tree instead of the minimized version
+    mst = kruskal_mst(g; minimize=true) # calculate the maximum tree instead of the minimized version
     Ii = src.(mst)
     Ji = dst.(mst)
     Vi = weight.(mst)
@@ -259,11 +276,11 @@ function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
 
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
 
-    M = size(A,1)
+    M = size(A, 1)
     # break up each column of A into  chunks
     chunklen = cld(M, scale)
-    slices=[]
-    grids=[]
+    slices = []
+    grids = []
     chunkstrt = 1:chunklen:M # the starting indices for each chunk
 
     for i in chunkstrt
@@ -272,12 +289,12 @@ function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
         S = A[i:ii, :] # a subset of rows, all columns
         G = grid[i:ii]
         # now normalize each column of the slice
-        Σslice = sum(S, dims = 1)
+        Σslice = sum(S, dims=1)
         push!(slices, S ./ Σslice)
         push!(grids, G)
     end
     return slices, grids
-end
+    end
 
 # dictionaries to hold intermediate results, keyed by (metric, scale)
 EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment

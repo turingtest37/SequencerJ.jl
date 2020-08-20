@@ -1,11 +1,12 @@
+
 "Smallest allowed graph weight/distance (instead of 0, which does not play well with sparse graphs.)"
 const ϵ = 1e-6
 
 # ******** EMD *********
-
 """
 
 Monge-Wasserstein or 1-p Wasserstein or Earth Mover's Distance.
+``show the math``
 
 """
 struct EMD <: SemiMetric
@@ -122,7 +123,6 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
         VA = v(vv)
     else
         A = uplusv[1:end-1]
-        @debug "A = uplusv[1:end-1]" A
         UA = u(A) # Calculate CDFs on whole domain
         VA = v(A)
     end

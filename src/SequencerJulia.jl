@@ -12,6 +12,7 @@ using LinearAlgebra: issymmetric, Symmetric, I
 import LightGraphs: bfs_parents, _bfs_parents
 
 include("bfs.jl")
+include("utils.jl")
 include("distancemetrics.jl")
 include("sequencer.jl")
 
@@ -23,7 +24,7 @@ export EMD, Energy
 
 export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
-export elong_start_index, elongation, dm, mst, elong, order
+export elong_start_index, elongation, D, mst, elong, stidx, order, rollup, prettyp
 
 
 end

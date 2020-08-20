@@ -39,7 +39,7 @@ using Images
         imgshuff = SMALL[:,Idx]
         seqres = sequence(imgshuff; scales=(1), metrics=(KLD, WASS1D))
         ind = order(seqres)
-        res = SMALL[:, ind]
+        res = imgshuff[:, ind]
         @test SMALL == res
     end
 
@@ -48,7 +48,7 @@ using Images
         imgshuff = MED[:,Idx]
         seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, WASS1D))
         ind = order(seqres)
-        res = MED[:, ind]
+        res = imgshuff[:, ind]
         @test MED == res
     end
 
@@ -57,7 +57,7 @@ using Images
         imgshuff = BIG[:,Idx]
         seqres = sequence(imgshuff; scales=(1,2,4), metrics=(KLD, WASS1D))
         ind = order(seqres)
-        res = BIG[:, ind]
+        res = imgshuff[:, ind]
         @test BIG == res
     end
 
