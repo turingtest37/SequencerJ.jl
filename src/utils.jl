@@ -19,5 +19,5 @@ function unroll(G::AbstractGraph, idx::Int; visited=Int[])
     for n in N
         unroll(G, n, visited=visited)
     end
-    return visited
+    return reverse(visited)
 end

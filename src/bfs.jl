@@ -12,7 +12,7 @@ bfs_parents(g::AbstractGraph, s::Integer; dir = :out) =
 For the given graph and vertex, return the list of the vertex's out neighbors 
 ranked by edge weight (ascending by default).
 """
-function outneighbors_ranked(g, v; order=:asc)
+function outneighbors_ranked(g, v; order=:desc)
     alln = collect(outneighbors(g,v))
     length(alln) == 1 && return alln
     W = LightGraphs.weights(g)
