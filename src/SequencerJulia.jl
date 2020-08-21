@@ -10,6 +10,8 @@ using SimpleWeightedGraphs
 using StatsBase: mean, ecdf, ECDF
 using LinearAlgebra: issymmetric, Symmetric, I
 import LightGraphs: bfs_parents, _bfs_parents
+import Base: show
+
 
 include("bfs.jl")
 include("utils.jl")

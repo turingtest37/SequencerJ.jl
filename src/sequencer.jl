@@ -35,8 +35,7 @@ mst(r::SequencerResult) = r.mst
 elong(r::SequencerResult) = r.η
 order(r::SequencerResult) = r.order
 
-import Base: show
-show(io::IO, s::SequencerResult) = println(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
+show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
 
 
 """
@@ -81,9 +80,12 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
 
-    # repackage any given iterator into a tuple
-    metrics = tuple(metrics...)
-    scales = tuple(scales...)
+    # repackage anything into a tuple
+    tuplify(x) = tuple(x...)
+
+    metrics = tuplify(metrics)
+
+    scales = tuplify(scales)
 
     # nb of columns in A
     N = size(A, 2)

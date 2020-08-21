@@ -1,6 +1,6 @@
 # SequencerJulia
 
-SequencerJulia is a pure Julia implementation of the Sequencer Algorithm, an analysis tool to identify and extract the principal trends in a set of 1-d data vectors.
+SequencerJulia is a pure Julia implementation of the [Sequencer Algorithm](https://github.com/dalya/Sequencer/), a data analysis tool to identify and extract the principal trends in a set of 1-d data vectors.
 
 Using SequencerJulia is straightforward:
 
