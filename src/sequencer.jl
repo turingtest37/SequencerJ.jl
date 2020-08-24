@@ -1,9 +1,10 @@
 """
+    SequencerResult
+
 Contains the results of a Sequencer run. Use the returned object to obtain details
 about the run results by calling the appropriate function.
 
-```
-jldoctest
+```julia-repl
 
 julia> r = sequence(A; metrics=ALL_METRICS, scales=(1,2,4))
 ┌ Info: Sequencing data with
@@ -17,9 +18,7 @@ julia> elong(r)
 julia> order(r)
 100-element Array{Int64,1}:
 [...]
-
 ```
-
 """
 struct SequencerResult
     EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
@@ -30,23 +29,62 @@ struct SequencerResult
     order::AbstractVector #final ordering from bfs
 end
 
+"""
+
+    D(r::SequencerResult)
+
+Return the final distance matrix from the Sequencer run.
+"""
 D(r::SequencerResult) = r.D
+
+"""
+
+    mst(r::SequencerResult)
+
+Return the final minimum spanning tree graph from a Sequencer run. 
+"""
 mst(r::SequencerResult) = r.mst
+
+"""
+
+    elong(r::SequencerResult)
+    
+Return the elongation coefficient of the final, weighted graph.
+"""
 elong(r::SequencerResult) = r.η
+
+"""
+
+    order(r::SequencerResult)
+
+Return the result column indices, as determined by the Sequencer algorithm.
+"""
 order(r::SequencerResult) = r.order
 
+"Sensibly display a SequencerResult object."
 show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
 
 
 """
+
     sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
 
-    Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
-    each column of data, possibly after dividing the data into smaller row sets. Columns are compared pairwise for each combination 
-    of metric and scale to create a n x n distance matrix
+Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
+each column of data, possibly after dividing the data into smaller row sets. Columns are compared pairwise for each combination 
+of metric and scale to create a n x n distance matrix that is analyzed as a graph using a novel algorithm. Details of the algorithm
+are provided in the paper by D. Baron and B. Ménard that is cited below.
 
-    The paper that describes the Sequencer algorithm and its applications can be found 
-    on Arxiv: [https://arxiv.org/abs/2006.13948].
+
+
+
+
+```julia-repl
+julia> sequence(A; metrics=(WASS1D,), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
+```
+
+
+The paper that describes the Sequencer algorithm and its applications can be found 
+on Arxiv: [https://arxiv.org/abs/2006.13948].
 ```
 @misc{baron2020extracting,
     title={Extracting the main trend in a dataset: the Sequencer algorithm},
@@ -63,8 +101,17 @@ show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf(
 
 TODO Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
+
 """
-function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
+# function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false) where {T <: Real}
+#     with_logger(silent ? NullLogger() : current_logger()) do
+#         return sequence(A, scales=scales, metrics=metrics, grid=grid, weightrows=weightrows)    
+#     end
+# end
+
+function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false) where {T <: Real}
+
+    silent && disable_logging(Logging.Error)
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
@@ -79,16 +126,12 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
 # observed data were captured.
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
+    # package the arguments to be consumable as iterators
+    metrics = tuple(metrics...)
+    scales = tuple(scales...)
 
-    # repackage anything into a tuple
-    tuplify(x) = tuple(x...)
-
-    metrics = tuplify(metrics)
-
-    scales = tuplify(scales)
-
-    # nb of columns in A
-    N = size(A, 2)
+    # rows M and columns N in A
+    M, N = size(A)
 
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
@@ -99,6 +142,17 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     η_all = []
     EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment    
     EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
+    Wr = ones(M) # identity
+    rowseq = collect(1:M) # row indices for applying row weight to column vectors
+    if weightrows
+        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=grid, weightrows=false, silent=true)
+        rowseq = SequencerJulia.order(r)
+        @show rowseq
+        Wr = 1 ./ collect(1:length(rowseq))
+    end
+    @show rowseq
+    idx = sortperm(rowseq)
+    @show idx
 
     @inbounds for k in metrics
         alg = k
@@ -110,12 +164,14 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             ηs = []
             # BFS sequence per chunk
             orderings = []
-            # split the data and grid into chunks
-            S, G = _splitnorm(A, grid, l)
+            # split the data, grid and row weights into chunks
+            # S = data, G = grid, WI = row indices, W = row weights
+            S, G, W = _splitnorm(A, grid, Wr[idx], l)
+            # @show W
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
-            tt = @elapsed for i in eachindex(S, G)
+            tt = @elapsed for i in eachindex(S, G, W)
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
                 m, lgrid = S[i], G[i]
@@ -123,8 +179,13 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
                 if alg in (EMD, Energy)
                     alg = alg((lgrid, lgrid))
                 end
+                # Weight the columns by the appropriate row weights (default = 1)
+                m .= W[i] .* m[:,1:end]
+                # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
+
                 # All the heavy lifting happens here, in the distance calculations
                 Dklm = abs.(pairwise(alg, m; dims=2)) .+ ϵ
+
                 # Measure our per-metric, per-scale, per-segment distance matrix
                 MSTklm, _, η, bfso = _measure_dm(Dklm)
                 # weight the distance matrix by its elongation factor
@@ -160,7 +221,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
         end
     end
-
+    
     # Create a sparse N x N proximity matrix to be filled with MST elongation-weighted edge
     # distances
     Pw = _weighted_p_matrix(N, MST_all, η_all)
@@ -184,14 +245,14 @@ end
 in the result corresponds to a column of data in D."
 function _measure_dm(D::AbstractMatrix)
     g = _mst(D) # minimum spanning tree for D
-    stidx = elong_start_index(g) # Least central point of MST
+    stidx = leastcentralpt(g) # Least central point of MST
     η = elongation(g, stidx)
     bfst = bfs_tree(g, stidx)
     return g, stidx, η, bfst
 end
 
 
-"Ensure the grid is compatible with the data. Create a grid if one was not provided."
+"Ensure the size of the grid is compatible with the data. Create a grid if one was not provided."
 function _ensuregrid!(grid, A)::AbstractVector
     if isnothing(grid)
         # create a sensible grid if one was not provided
@@ -228,7 +289,7 @@ function _weighted_p_matrix(N, graphs, ηs)
 end
 
 "Return the index of the least central node in the given graph."
-elong_start_index(g) = last(findmin(closeness_centrality(g)))
+leastcentralpt(g) = last(findmin(closeness_centrality(g)))
 
 "Return the half-length or mean of the given path lengths (distances)."
 _halflen(paths) = mean(paths)
@@ -263,7 +324,7 @@ function _mst(dm::AbstractMatrix)
 # TODO Ask Dalya about this
     g = SimpleWeightedGraph(issymmetric(dm) ? dm : Symmetric(dm))
 # Minimum Spanning Tree using the Kruskal algorithm
-    mst = kruskal_mst(g; minimize=true) # calculate the maximum tree instead of the minimized version
+    mst = kruskal_mst(g; minimize=true)
     Ii = src.(mst)
     Ji = dst.(mst)
     Vi = weight.(mst)
@@ -275,7 +336,7 @@ end
 
 "Split the given `m x n` matrix and grid into `scale` parts along the column dimension such
 that the resulting matrices (chunks) are approximately of dimension `k x n` where `k ≊ m / scale`"
-function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
+function _splitnorm(A::AbstractMatrix{T}, grid, rw, scale) where {T <: Real}
 
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
 
@@ -284,6 +345,8 @@ function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
     chunklen = cld(M, scale)
     slices = []
     grids = []
+    weights = []
+
     chunkstrt = 1:chunklen:M # the starting indices for each chunk
 
     for i in chunkstrt
@@ -291,15 +354,15 @@ function _splitnorm(A::AbstractMatrix, grid::AbstractVector, scale::Int)
         ii = clamp(ii, one(ii), M)  # keepin' it real....
         S = A[i:ii, :] # a subset of rows, all columns
         G = grid[i:ii]
+        W = rw[i:ii]
         # now normalize each column of the slice
         Σslice = sum(S, dims=1)
         push!(slices, S ./ Σslice)
         push!(grids, G)
+        push!(weights, W)
     end
-    return slices, grids
+    return slices, grids, weights
     end
 
-# dictionaries to hold intermediate results, keyed by (metric, scale)
-EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment
-
+EOSeg = Dict{Tuple,Any}() # Dictionary of per-segment intermediate elongation and sequence results
 EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances

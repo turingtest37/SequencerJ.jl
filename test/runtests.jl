@@ -47,6 +47,16 @@ using Images
         @test SMALL == res
     end
 
+    @testset "reorder small image, weightrows = true" begin
+        Idx = shuffle(axes(SMALL,2))
+        imgshuff = SMALL[:,Idx]
+        seqres = sequence(imgshuff; scales=(1), weightrows=true) #all metrics
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @show loss(SMALL,res)
+        @test SMALL == res
+    end
+
     @testset "reorder med image, orig. portrait" begin
         Idx = shuffle(axes(MED,2))
         imgshuff = MED[:,Idx]
@@ -102,6 +112,10 @@ using Images
     @testset "show" begin
         seqres = sequence(SMALL; scales=(2,), metrics=(L2,))
         @test occursin("Sequencer Result", "$(seqres)")
+    end
+
+    @testset "silent mode" begin
+        # @test read(IOBuffer(sequence(SMALL; scales=(2,), metrics=(L2,), silent=true)), String) == ""
     end
 
 end

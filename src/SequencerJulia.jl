@@ -20,13 +20,14 @@ include("sequencer.jl")
 
 # functions
 export emd, energy, cdf_distance, sequence
+export leastcentralpt, elongation, D, mst, elong, stidx, order, rollup, prettyp
 
 # types
-export EMD, Energy
+export SequencerResult, EMD, Energy
 
+# constants
 export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
-export elong_start_index, elongation, D, mst, elong, stidx, order, rollup, prettyp
 
-
+# TODO
 end
