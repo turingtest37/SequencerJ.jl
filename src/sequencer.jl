@@ -145,7 +145,8 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     Wr = ones(M) # identity
     rowseq = collect(1:M) # row indices for applying row weight to column vectors
     if weightrows
-        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=grid, weightrows=false, silent=true)
+        # must force grid back to nothing here so that row sequencing uses its own grid
+        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=true)
         rowseq = SequencerJulia.order(r)
         @show rowseq
         Wr = 1 ./ collect(1:length(rowseq))
