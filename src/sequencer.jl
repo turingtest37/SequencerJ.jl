@@ -148,12 +148,10 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
         # must force grid back to nothing here so that row sequencing uses its own grid
         r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=true)
         rowseq = SequencerJulia.order(r)
-        @show rowseq
         Wr = 1 ./ collect(1:length(rowseq))
     end
-    @show rowseq
-    idx = sortperm(rowseq)
-    @show idx
+    #row weight index
+    rwidx = sortperm(rowseq)
 
     @inbounds for k in metrics
         alg = k
@@ -167,8 +165,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             orderings = []
             # split the data, grid and row weights into chunks
             # S = data, G = grid, WI = row indices, W = row weights
-            S, G, W = _splitnorm(A, grid, Wr[idx], l)
-            # @show W
+            S, G, W = _splitnorm(A, grid, Wr[rwidx], l)
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
