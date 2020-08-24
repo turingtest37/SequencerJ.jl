@@ -1,12 +1,8 @@
 # SequencerJulia
 
-SequencerJulia is a pure Julia implementation of the [Sequencer Algorithm](https://github.com/dalya/Sequencer/), a data analysis tool to identify and extract the principal trends in a set of 1-d data vectors.
+SequencerJulia is a pure [Julia](https://julialang.org/) implementation of the [Sequencer Algorithm](https://github.com/dalya/Sequencer/), a data analysis tool to identify and extract the principal trends in a set of 1-d data vectors.
 
-Using SequencerJulia is straightforward:
-
-Get Julia (https://julialang.org/)
-
-From the Julia REPL:
+Using SequencerJulia is straightforward. From the Julia REPL:
 
     julia> using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJulia.jl/"))
     [...]
@@ -14,12 +10,14 @@ From the Julia REPL:
     julia> using SequencerJulia
     [ Info: Precompiling SequencerJulia [348581b9-6e84-42e0-ac4e-fe9177c221e6]
     [...]
-    # You may get WARNINGs upon compilation. You may safely ignore them.
+    # You may get WARNINGs upon compilation. You can safely ignore them.
 
     julia> A = rand(50, 100)
     50×100 Array{Float64,2}:
     [...]
 
+ Measure A using L2, Earth Mover's Distance, the Kullback-Lubler divergence, and Szekely's energy metric.
+ See [`Distances.SqEuclidian`](@ref), [`EMD`](@ref), [`Distances.KLDivergence`](@ref), [`Energy`](@ref) 
     julia> m = ALL_METRICS
     (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 
@@ -118,12 +116,10 @@ In a similar fashion, get final elongations and the MST for each metric+scale
     (KLDivergence(), 2)   => (3.745, {100, 99} directed simple Int64 graph)
 
 More and better docs to follow!
-```
-
 
 The paper that describes the Sequencer algorithm and its applications can be found 
 on Arxiv: [https://arxiv.org/abs/2006.13948].
-```
+
 @misc{baron2020extracting,
     title={Extracting the main trend in a dataset: the Sequencer algorithm},
     author={Dalya Baron and Brice Ménard},
@@ -133,4 +129,3 @@ on Arxiv: [https://arxiv.org/abs/2006.13948].
     primaryClass={cs.LG},
     year=2020
 }
-```

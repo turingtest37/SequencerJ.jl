@@ -1,5 +1,3 @@
-Pkg.activate("./test")
-
 using Test
 using SequencerJulia
 using StatsBase
@@ -45,8 +43,7 @@ using Images
         seqres = sequence(imgshuff; scales=(1)) #all metrics
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(SMALL,res)
-        @test SMALL == res
+        @test loss(SMALL,res) ≈ 0
     end
 
     @testset "reorder small image, weightrows = true" begin
@@ -64,8 +61,16 @@ using Images
         seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2))
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(MED,res)
-        @test MED == res
+        @test loss(MED,res) ≈ 0
+    end
+
+    @testset "reorder med image, orig. portrait, weightrows=true" begin
+        Idx = shuffle(axes(MED,2))
+        imgshuff = MED[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2), weightrows=true)
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @test loss(MED,res) ≈ 0
     end
 
     @testset "reorder med image, landscape" begin
@@ -75,8 +80,17 @@ using Images
         seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2))
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(MED,res)
-        @test MED == res
+        @test loss(MED,res) ≈ 0
+    end
+
+    @testset "reorder med image, landscape, weightrows=true" begin
+        MED = permutedims(MED)
+        Idx = shuffle(axes(MED,2))
+        imgshuff = MED[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2), metrics=(KLD, L2), weightrows=true)
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @test loss(MED,res) ≈ 0
     end
 
     @testset "reorder large image, orig. landscape" begin
@@ -85,8 +99,16 @@ using Images
         seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD))
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(BIG,res)
-        @test BIG == res
+        @test loss(BIG,res) ≈ 0
+    end
+
+    @testset "reorder large image, orig. landscape, weightrows=true" begin
+        Idx = shuffle(axes(BIG,2))
+        imgshuff = BIG[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD), weightrows=true)
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @test loss(BIG,res) ≈ 0
     end
 
     @testset "reorder large image, portrait" begin
@@ -96,10 +118,18 @@ using Images
         seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD))
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(BIG,res)
-        @test BIG == res
+        @test loss(BIG,res) ≈ 0
     end
 
+    @testset "reorder large image, portrait, weightrows=true" begin
+        BIG = permutedims(BIG)
+        Idx = shuffle(axes(BIG,2))
+        imgshuff = BIG[:,Idx]
+        seqres = sequence(imgshuff; scales=(1,2,4), metrics=(L2, KLD), weightrows=true)
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        @test loss(BIG,res) ≈ 0
+    end
 
     @testset "Accessor functions" begin    
         seqres = sequence(SMALL; scales=(2,), metrics=(L2,))
@@ -120,4 +150,21 @@ using Images
         @test sequence(SMALL; scales=(2,), metrics=(L2,), silent=true) !== nothing
     end
 
+    @testset "prettyp of a vector" begin
+        v = collect(1:20)
+        r = "1,2,3...18,19,20"
+        @test r == prettyp(v)
+    end
+
+    @testset "prettyp of a vector, more digits" begin
+        v = collect(1:20)
+        r = "1,2,3,4,5...16,17,18,19,20"
+        @test r == prettyp(v, 5)
+    end
+
+    @testset "prettyp of a vector, small" begin
+        v = collect(1:5)
+        r = "1,2,3,4,5"
+        @test r == prettyp(v)
+    end
 end

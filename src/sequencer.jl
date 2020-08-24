@@ -216,7 +216,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             EOSeg[(alg, l)] = (ηs, orderings)
             EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
+            @info "$(k) at scale $(l): η = $(@sprintf("%.1g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
         end
     end
     
@@ -234,10 +234,10 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     # head = round.(collect(order[1:5]); digits=2)
     # tail = round.(collect(order[end-5:end]); digits=2)
     # s = join(string(head),",") * "..." * join(string(tail),",") 
-    @info "Final ordering: $(order)"
+    @info "Final ordering: $(prettyp(order))"
     return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order)
 end
-
+#@TODO #20
 
 "Evaluate a given distance matrix and return its MST graph, elongation, and optimal ordering of vertices. Each vertex
 in the result corresponds to a column of data in D."

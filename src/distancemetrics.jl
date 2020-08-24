@@ -4,9 +4,7 @@ const ϵ = 1e-6
 
 # ******** EMD *********
 """
-
-Monge-Wasserstein or 1-p Wasserstein or Earth Mover's Distance.
-``show the math``
+Earth Mover's Distance, a.k.a. 1-p Wasserstein distance
 
 """
 struct EMD <: SemiMetric
@@ -17,9 +15,23 @@ end
 EMD() = EMD(nothing)
 
 """
+
+    EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
+
 Calculate the Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
-between the two given vectors (which are treated as weights on a grid
-defined by the first axis of u).
+between the two given vectors, accepting a default grid. `u` and `v` are treated as 
+weights on the grid. The default grid is equal to the first axis of `u` and `v`.
+
+This function is not intended to be called directly. Instead, use WASS1D.
+Example:
+
+```julia-repl
+
+julia> sequence(A; metrics=(WASS1D,))  #note the trailing `,` needed to denote a 1-element tuple.
+
+```
+
+
 """
 function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
     gridu = collect(first(axes(u)))
@@ -27,6 +39,48 @@ function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
     EMD(gridu, gridv, u, v)
 end
 
+"""
+
+    EMD(u,v,uw,vw)
+
+Calculate the Earth Mover's Distance using an explicit grid. This method is not intended to be called directly.
+Instead, specify a grid in the call to sequence, with the WASS1D constant.
+
+```julia-repl
+
+julia> A = rand(50, 100)
+50×100 Array{Float64,2}:
+[...]
+
+julia> m = ALL_METRICS
+(SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+
+julia> s = (1,2,4)
+(1, 2, 4)
+
+julia> sequence(A; metrics=m, scales=s)
+┌ Info: Sequencing data with
+│     shape: (50, 100)
+│     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+└     scale(s): (1, 2, 4)
+[ Info: SqEuclidean(0.0) at scale 1: η = 5.214 (3.4s)
+[...]
+
+
+
+```
+
+
+
+
+```julia-repl
+
+julia> sequence(A; metrics=(WASS1D,), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
+
+```
+
+
+"""
 function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
     length(u) == length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")

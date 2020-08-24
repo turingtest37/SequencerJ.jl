@@ -21,3 +21,24 @@ function unroll(G::AbstractGraph, idx::Int; visited=Int[])
     end
     return reverse(visited)
 end
+
+"""
+Return the first and last `len` elements of the vector as a string.
+
+```jldoctest
+#Example
+v = collect(1:10);
+prettyp(v)
+
+#Result
+"1,2,3...8,9,10"
+
+```
+
+"""
+function prettyp(v::AbstractVector, len::Int = 3)
+    length(v) < 7 && return join(string.(v), ",")
+    head = join(string.(v[1:len]),",")
+    tail = join(string.(v[(end-(len-1)):end]),",")
+    return join([head,tail],"...")
+end

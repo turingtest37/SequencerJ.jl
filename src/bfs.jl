@@ -1,5 +1,5 @@
 """
-Overload LightGraphs.bfs_parents to provide an alternative outneighbors function.
+Overload of LightGraphs.bfs_parents that provides an alternative outneighbors function.
 
 See [`LightGraphs.bfs_parents`](@Ref)
 """
@@ -10,7 +10,9 @@ bfs_parents(g::AbstractGraph, s::Integer; dir = :out) =
 
 """
 For the given graph and vertex, return the list of the vertex's out neighbors 
-ranked by edge weight (ascending by default).
+ranked by edge weight between vertex and the neighbor (ascending order by default).
+This function is invoked by [`bfs_parents`](@Ref) and is not intended to be called directly.
+    @ TODO #17 Benchmark this to see if using views would be faster.
 """
 function outneighbors_ranked(g, v; order=:asc)
     alln = collect(outneighbors(g,v))
