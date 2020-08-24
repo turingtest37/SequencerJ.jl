@@ -1,3 +1,5 @@
+Pkg.activate("./test")
+
 using Test
 using SequencerJulia
 using StatsBase
@@ -53,8 +55,7 @@ using Images
         seqres = sequence(imgshuff; scales=(1), weightrows=true) #all metrics
         ind = order(seqres)
         res = imgshuff[:, ind]
-        @show loss(SMALL,res)
-        @test SMALL == res
+        @test loss(SMALL,res) ≈ 0
     end
 
     @testset "reorder med image, orig. portrait" begin
@@ -114,8 +115,9 @@ using Images
         @test occursin("Sequencer Result", "$(seqres)")
     end
 
-    @testset "silent mode" begin
-        # @test read(IOBuffer(sequence(SMALL; scales=(2,), metrics=(L2,), silent=true)), String) == ""
+    # TODO #19 figure out how to test for zero log output....
+    @testset "silent mode does not fail" begin
+        @test sequence(SMALL; scales=(2,), metrics=(L2,), silent=true) !== nothing
     end
 
 end
