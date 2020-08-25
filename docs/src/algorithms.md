@@ -4,11 +4,16 @@
 CurrentModule = SequencerJulia
 ```
 
+```@autodocs
+Modules=[SequencerJulia]
+Pages=["distancemetrics.jl"]
+```
+<!-- 
+
 ## EMD
 ```@docs
 EMD()
-EMD(u,v)
-EMD(u,v,uw,vw)
+EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
 (m::EMD)(u,v)
 (m::EMD)(u,v,uw,vw)
 emd(u,v)
@@ -25,7 +30,7 @@ Energy(u,v,uw,vw)
 energy(u::AbstractVector, v=u)
 energy(u,v,uw,vw)
 
-```
+``` -->
 
 ### L2
 ```@docs

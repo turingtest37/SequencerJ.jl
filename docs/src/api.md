@@ -4,7 +4,12 @@
 CurrentModule = SequencerJulia
 ```
 
-## Module
+```@autodocs
+Modules=[SequencerJulia]
+Pages=["SequencerJulia.jl", "sequencer.jl", "bfs.jl", "utils.jl"]
+```
+
+<!-- ## Module
 ```@docs
 SequencerJulia
 ```
@@ -20,18 +25,11 @@ Distances.KLDivergence
 
 ## External functions
 ```@docs
-sequence
+sequence(A::VecOrMat{T};) where {T <: Real}
 D
 mst
 elong
 order
-EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
-EMD(u,v,uw,vw)
-Energy(u,v)
-Energy(u,v,uw,vw)
-emd(u,v)
-energy
-cdf_distance
 elongation
 leastcentralpt
 loss
@@ -61,4 +59,4 @@ SequencerJulia._halfwidth
 SequencerJulia._weighted_p_matrix
 SequencerJulia._measure_dm
 SequencerJulia.outneighbors_ranked
-```
+``` -->

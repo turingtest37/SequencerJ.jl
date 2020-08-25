@@ -83,25 +83,21 @@ show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf(
 
 """
 
-    sequence(A::VecOrMat{T}; scales=(1,4), metrics=ALL_METRICS, grid=nothing) where {T <: Real}
+    sequence(A::VecOrMat{T};) where {T <: Real}
 
 Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
 each column of data, possibly after dividing the data into smaller row sets. Columns are compared pairwise for each combination 
 of metric and scale to create a n x n distance matrix that is analyzed as a graph using a novel algorithm. Details of the algorithm
 are provided in the paper by D. Baron and B. Ménard that is cited below.
 
-
-
-
-
 ```julia-repl
 julia> sequence(A; metrics=(WASS1D,), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
 ```
 
-
 The paper that describes the Sequencer algorithm and its applications can be found 
 on Arxiv: [https://arxiv.org/abs/2006.13948].
-```
+```bibtex
+
 @misc{baron2020extracting,
     title={Extracting the main trend in a dataset: the Sequencer algorithm},
     author={Dalya Baron and Brice Ménard},
@@ -113,10 +109,7 @@ on Arxiv: [https://arxiv.org/abs/2006.13948].
 }
 ```
 
-```jldoctest```
-
-TODO Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
-
+TODO #22 Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
 """
 function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false, lossfn=L2) where {T <: Real}
