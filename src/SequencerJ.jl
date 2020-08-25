@@ -1,4 +1,4 @@
-module SequencerJulia
+module SequencerJ
 
 using Logging
 using Printf: @sprintf

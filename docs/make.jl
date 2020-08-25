@@ -1,5 +1,5 @@
 using Documenter
-using SequencerJulia
+using SequencerJ
 
 makedocs(
     sitename = "SequencerJulia",

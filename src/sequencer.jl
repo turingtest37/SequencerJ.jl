@@ -155,7 +155,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
         r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent)
         disable_logging(loglevel)
         # @show "sequencer result" r
-        rowseq = SequencerJulia.order(r)
+        rowseq = SequencerJ.order(r)
         Wr = 1 ./ collect(1:length(rowseq))
         # @show "Wr rowseq result" Wr rowseq
     end
