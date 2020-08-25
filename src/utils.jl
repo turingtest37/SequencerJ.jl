@@ -26,13 +26,21 @@ end
 Return the first and last `len` elements of the vector as a string.
 
 ```jldoctest
-#Example
+# Example
 v = collect(1:10);
 prettyp(v)
 
-#Result
+# output
 "1,2,3...8,9,10"
+```
 
+```jldoctest
+# Example w/5 elements visible
+v = collect(1:10);
+prettyp(v, 5)
+
+# output
+"1,2,3,4,5...6,7,8,9,10"
 ```
 
 """

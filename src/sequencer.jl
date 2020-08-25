@@ -27,6 +27,7 @@ struct SequencerResult
     mst::LightGraphs.AbstractGraph # final mst
     η::Real # final elongation
     order::AbstractVector #final ordering from bfs
+    loss::Real
 end
 
 """
@@ -60,6 +61,21 @@ elong(r::SequencerResult) = r.η
 Return the result column indices, as determined by the Sequencer algorithm.
 """
 order(r::SequencerResult) = r.order
+
+"""
+
+Return the result of `lossfn(A, A[:,order])`, where `order` is the final sequence extracted from A,
+and `lossfn` may be provided as e.g. `sequence(A; lossfn=L2(), [...])`.
+
+The provided loss function must accept two matrices as arguments.
+
+    #example
+    my_loss(A,B) = 
+
+See [`L2`](@Ref).
+
+"""
+loss(r::SequencerResult) = r.loss
 
 "Sensibly display a SequencerResult object."
 show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
@@ -103,13 +119,7 @@ TODO Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
 
 """
-# function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false) where {T <: Real}
-#     with_logger(silent ? NullLogger() : current_logger()) do
-#         return sequence(A, scales=scales, metrics=metrics, grid=grid, weightrows=weightrows)    
-#     end
-# end
-
-function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false) where {T <: Real}
+function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false, lossfn=L2) where {T <: Real}
 
     silent && disable_logging(Logging.Error)
 
@@ -145,10 +155,16 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     Wr = ones(M) # identity
     rowseq = collect(1:M) # row indices for applying row weight to column vectors
     if weightrows
+        @debug "Initial Wr rowseq" Wr rowseq
+        loglevel = Logging.min_enabled_level(current_logger())
+        # @show loglevel
         # must force grid back to nothing here so that row sequencing uses its own grid
-        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=true)
+        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent)
+        disable_logging(loglevel)
+        # @show "sequencer result" r
         rowseq = SequencerJulia.order(r)
         Wr = 1 ./ collect(1:length(rowseq))
+        # @show "Wr rowseq result" Wr rowseq
     end
     #row weight index
     rwidx = sortperm(rowseq)
@@ -166,6 +182,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             # split the data, grid and row weights into chunks
             # S = data, G = grid, WI = row indices, W = row weights
             S, G, W = _splitnorm(A, grid, Wr[rwidx], l)
+            # @show "split W" W
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
@@ -178,7 +195,10 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
                     alg = alg((lgrid, lgrid))
                 end
                 # Weight the columns by the appropriate row weights (default = 1)
-                m .= W[i] .* m[:,1:end]
+                # @show "W[i] m[:,1:end]" W[i] m[:,1:end]
+                mp = W[i] .* m[:,1:end]
+                # @show "W[i] .* m[:,1:end]" mp
+                m .= mp
                 # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
 
                 # All the heavy lifting happens here, in the distance calculations
@@ -233,9 +253,10 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     order = unroll(bfstD, stidx)
     # head = round.(collect(order[1:5]); digits=2)
     # tail = round.(collect(order[end-5:end]); digits=2)
-    # s = join(string(head),",") * "..." * join(string(tail),",") 
-    @info "Final ordering: $(prettyp(order))"
-    return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order)
+    # s = join(string(head),",") * "..." * join(string(tail),",")
+    loss = lossfn(A, A[:,order])
+    @info "Final ordering: $(prettyp(order))\nloss=$(loss)"
+    return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order, loss)
 end
 #@TODO #20
 

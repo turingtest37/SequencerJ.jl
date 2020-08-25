@@ -2,16 +2,18 @@
 "Smallest allowed graph weight/distance (instead of 0, which does not play well with sparse graphs.)"
 const ϵ = 1e-6
 
-# ******** EMD *********
 """
-Earth Mover's Distance, a.k.a. 1-p Wasserstein distance
+
+    EMD
+
+Earth Mover's Distance, a.k.a. 1-p Monge-Wasserstein distance
 
 """
 struct EMD <: SemiMetric
     grids::Union{Nothing,Tuple}
 end
 
-"Default constructor with no grid provided."
+"EMD distance with with no grid provided. Grids default to axes(u,1) and axes(v,1)."
 EMD() = EMD(nothing)
 
 """
@@ -23,15 +25,6 @@ between the two given vectors, accepting a default grid. `u` and `v` are treated
 weights on the grid. The default grid is equal to the first axis of `u` and `v`.
 
 This function is not intended to be called directly. Instead, use WASS1D.
-Example:
-
-```julia-repl
-
-julia> sequence(A; metrics=(WASS1D,))  #note the trailing `,` needed to denote a 1-element tuple.
-
-```
-
-
 """
 function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
     gridu = collect(first(axes(u)))
@@ -51,35 +44,23 @@ Instead, specify a grid in the call to sequence, with the WASS1D constant.
 julia> A = rand(50, 100)
 50×100 Array{Float64,2}:
 [...]
-
-julia> m = ALL_METRICS
-(SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
-
-julia> s = (1,2,4)
-(1, 2, 4)
-
-julia> sequence(A; metrics=m, scales=s)
+julia> g = collect(0.5:0.5:div(size(A,1),2))
+50-element Array{Float64,1}:
+   0.5
+   1.0
+   1.5
+  [...]
+  24.0
+  24.5
+  25.0
+julia> sequence(A; grid = g)
 ┌ Info: Sequencing data with
 │     shape: (50, 100)
 │     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 └     scale(s): (1, 2, 4)
 [ Info: SqEuclidean(0.0) at scale 1: η = 5.214 (3.4s)
 [...]
-
-
-
 ```
-
-
-
-
-```julia-repl
-
-julia> sequence(A; metrics=(WASS1D,), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
-
-```
-
-
 """
 function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
@@ -88,32 +69,64 @@ function EMD(u,v,uw,vw)
     cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 1)
 end
 
+"Same as `EMD(u,v)` but using Distances-style runnable type syntax."
 function (m::EMD)(u,v=u)
     m.grids === nothing ? EMD(u,v) : EMD(m.grids...,u,v)
 end
 
+"Same as `EMD(u,v,uw,vw)` but using Distances-style runnable type syntax."
 (::EMD)(u,v,uw,vw) = EMD(u,v,uw,vw)
 
+"""
+Convenience method for `EMD(u,v)`.
+
+See [`EMD(u,v)`](@ref)
+"""
 emd(u::AbstractArray, v = u) = EMD(u, v)
 
+"""
+Convenience method for `EMD(u,v,uw,vw)`.
+
+See [`EMD(u,v,uw,vw)`](@ref)
+"""
 emd(u,v,uw,vw) = EMD(u,v,uw,vw)
 
 
 # ******** ENERGY *********
 
+"""
+    Energy
+
+Energy distance as defined by Székely. An explicit grid may be provided. Default is 
+axes(u,1) where 
+
+[Energy distance](https://en.wikipedia.org/wiki/Energy_distance)
+
+"""
 struct Energy <: SemiMetric
     grids::Union{Nothing,Tuple}
 end
 
+"Default constructor with no specified grid."
 Energy() = Energy(nothing)
 
-# enables dispatching on the type directly
+"Enables dispatching on the type directly"
 function (m::Energy)(u,v)
     m.grids === nothing ? Energy(u,v) : Energy(m.grids...,u,v)
 end
 
+"Direct dispatch on an object of type Energy."
 (::Energy)(u,v,uw,vw) = Energy(u,v,uw,vw)
 
+
+"""
+
+    Energy(u,v,uw,vw)
+
+Calculate Székely's energy distance between the two given vectors, `u` and `v`, 
+whose weights `uw`, `vw` are treated as a empirical cumulative distribution function (CDF).
+`u` and `v` must have the same length, respectively, as `uw` and `vw`. 
+"""
 function Energy(u,v,uw,vw)
     length(u) ==  length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) ==  length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
@@ -121,6 +134,14 @@ function Energy(u,v,uw,vw)
     sqrt(2) * cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 2)
 end
 
+
+"""
+
+    Energy(u,v)
+
+Calculate Székely's energy distance between the two given vectors, accepting a default grid.
+`u` and `v` are treated as weights on the grid. The default grid is equal to the first axis of `u` and `v`.
+"""
 function Energy(u,v)
     gridu = collect(first(axes(u)))
     gridv = collect(first(axes(v)))
@@ -129,11 +150,15 @@ end
 
 """
 Convenience function for Energy with a supplied grid.
+
+See [`Energy(u,v,uw,vw)`](@ref)
 """
 energy(u, v, uw, vw) = Energy(u, v, uw, vw)
 
 """
 Convenience function for Energy with a default unit grid.
+
+    See [`Energy(u,v)`](@ref)
 """
 energy(u::AbstractVector, v=u) = Energy(u,v)
 
