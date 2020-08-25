@@ -58,7 +58,7 @@ julia> sequence(A; grid = g)
 │     shape: (50, 100)
 │     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 └     scale(s): (1, 2, 4)
-[ Info: SqEuclidean(0.0) at scale 1: η = 5.214 (3.4s)
+[ Info: `SqEuclidean(0.0) at scale 1: η = 5.214 (3.4s)
 [...]
 ```
 """
@@ -227,13 +227,15 @@ Constant to use when specifying the Square Euclidean or L2 distance metric for a
     ``
         L2(x,y) = Σ ||x - y||²
     ``
-See [`Distances.SqEuclidean`](@Ref)
 
+See [`SqEuclidean()`](@ref)
 """
 const L2 = Distances.SqEuclidean()
 
 """
 Kullbach-Leibler Divergence metric.
+
+See [`KLDivergence()`](@ref)
 """
 const KLD = Distances.KLDivergence()
 
