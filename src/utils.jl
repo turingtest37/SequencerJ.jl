@@ -9,7 +9,8 @@ function prettyp(G::AbstractGraph, strtidx::Int; pystyle=false)
 end
 
 """
-Return the outbound vertices that were visited from the given starting index.
+Walk the given graph, starting from the given vertex,
+returning the list of all outbound vertices that are visited.
 """
 function unroll(G::AbstractGraph, idx::Int; visited=Int[])
     idx in visited && return visited

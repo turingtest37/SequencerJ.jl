@@ -19,8 +19,8 @@ include("distancemetrics.jl")
 include("sequencer.jl")
 
 # functions
-export emd, energy, cdf_distance, sequence
-export leastcentralpt, elongation, D, mst, elong, stidx, order, rollup, prettyp
+export emd, energy, cdf_distance, sequence, leastcentralpt, elongation, D, mst
+export elong, stidx, order, rollup, prettyp, loss
 
 # types
 export SequencerResult, EMD, Energy
@@ -28,6 +28,4 @@ export SequencerResult, EMD, Energy
 # constants
 export L2, WASS1D, KLD, ENERGY, ALL_METRICS
 
-
-# TODO
 end

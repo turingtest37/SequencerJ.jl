@@ -25,9 +25,11 @@ D
 mst
 elong
 order
-EMD
-Energy
-emd
+EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
+EMD(u,v,uw,vw)
+Energy(u,v)
+Energy(u,v,uw,vw)
+emd(u,v)
 energy
 cdf_distance
 elongation
