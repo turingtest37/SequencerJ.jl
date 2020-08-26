@@ -2,33 +2,68 @@
 
 ## Installing SequencerJ
 
-SequencerJ is *not yet* a registered package, but installing it requires mere keyst
+SequencerJ is *not yet* a registered package, but installing it requires mere whispers of additional keystroke compared to those for a regular package:
 
 ```@repl
     using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
+    [...]
+    using SequencerJ
+    [ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
+    [...]
 ```
-
+You may get **WARN**INGs upon compilation. You can safely ignore them for most purposes, but if you are developing SequencerJ locally and use the `Revise` package, note that you may have to restart your Julia environment more often than usual.
 
 
 ## Using SequencerJ
 
+Getting started with SequencerJ is straightforward:
 
-Using SequencerJ is straightforward. From the Julia REPL:
+First, we need to wrangle some data to analyze. For a quick (but unpromising) start, let's use a random array.
+```@example 1
+A = rand(100,50);
 ```
 
+Basic usage is simply:
+```@example 1
+r = sequence(A)
+```
+
+As you can see, a fair amount of output is produced by default. With no other arguments, `sequence` applies all algorithms it knows to the data, each one at scales of 1, 2 and 4. Scale means the number of parts into which the data is partitioned. Each section or *chunk* contains approximately `size(A,1)/scale` elements. For example, 100 rows at scale 3 will result in chunks of 33, 33, and 34 rows.
+
+Set scale using the `scales` keyword:
+```@example 2
+r = sequence(A, scales=(1,3))
+```
+
+Similarly, distance algorithms may be specified with the `metrics` keyword.
+```@example 2
+r = sequence(A, scales=(1,3))
+```
+
+By default, sequence prints out informative messages as it works. The `silent=true` keyword argument puts an end to that behavior.
+```@example 2
+r = sequence(A; silent=true)
 ```
 
 
-    julia> using SequencerJ
-    [ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
-    [...]
-    # You may get WARNINGs upon compilation. You can safely ignore them.
+To make sense of A, we must choose which statistical distance metrics to apply. Each metric compares A pairwise, column by column, to create a distance matrix. The matrix is analyzed using graph theory to identify an *optimal* ordering of columns in A.
 
-    julia> A = rand(50, 100)
-    50×100 Array{Float64,2}:
-    [...]
 
- Measure A using L2, Earth Mover's Distance, the Kullback-Lubler divergence, and Szekely's energy metric.
+
+This optimal sequence represents the least-cost path through the distance matrix and hence the closest affinities between columns, as proximity is the inverse of distance. The algorithm is described in detail [in the paper](https://arxiv.org/abs/2006.13948)[^paper].
+
+
+
+SequencerJ currently supports four metrics that A using L2, Earth Mover's Distance, the Kullback-Lubler divergence, and Szekely's energy metric.
+
+```
+```
+
+The `resources` directory contains sample images that make better target practice for the Sequencer.
+
+
+
+```@example 2
  See [`Distances.SqEuclidian`](@ref), [`EMD`](@ref), [`Distances.KLDivergence`](@ref), [`Energy`](@ref) 
     julia> m = ALL_METRICS
     (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
@@ -129,9 +164,19 @@ In a similar fashion, get final elongations and the MST for each metric+scale
 
 
 
-
-
 ## The Sequencer Algorithm
 
+The complete aogrithm
 
-As another example of how the Sequencer algorithm may be used, see [Mapping Earth's deepest secrets](https://science.sciencemag.org/content/368/6496/1183).
+[^paper]
+    @misc{baron2020extracting,
+    title={Extracting the main trend in a dataset: the Sequencer algorithm},
+    author={Dalya Baron and Brice Ménard},
+    year={2020},
+    eprint={2006.13948},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    year=2020
+}
+    As another example of how the Sequencer algorithm may be used, see [Mapping Earth's deepest secrets](https://science.sciencemag.org/content/368/6496/1183).
+

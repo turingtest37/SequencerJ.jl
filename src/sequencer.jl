@@ -148,18 +148,17 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     Wr = ones(M) # identity
     rowseq = collect(1:M) # row indices for applying row weight to column vectors
     if weightrows
-        @debug "Initial Wr rowseq" Wr rowseq
-        loglevel = Logging.min_enabled_level(current_logger())
-        # @show loglevel
-        # must force grid back to nothing here so that row sequencing uses its own grid
+        currlogl = Logging.min_enabled_level(current_logger())
+        # force grid back to nothing here so that row sequencing uses its own grid
         r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent)
-        disable_logging(loglevel)
-        # @show "sequencer result" r
-        rowseq = SequencerJ.order(r)
+        # go back to logging regularly by calling disable_logging, oddly enough
+        disable_logging(currlogl)
+        # get the optimal ordering for rows
+        rowseq = order(r)
+        # weights are simply the reciprocal. Maybe look at a different formula? Linear? Wr = (1 .- rowseq ./ M)
         Wr = 1 ./ collect(1:length(rowseq))
-        # @show "Wr rowseq result" Wr rowseq
     end
-    #row weight index
+    #row weight index; use this below to reorder Wr before chunking
     rwidx = sortperm(rowseq)
 
     @inbounds for k in metrics
@@ -172,10 +171,8 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             ηs = []
             # BFS sequence per chunk
             orderings = []
-            # split the data, grid and row weights into chunks
-            # S = data, G = grid, WI = row indices, W = row weights
+            # split the data A, grid and row weights Wr into chunks
             S, G, W = _splitnorm(A, grid, Wr[rwidx], l)
-            # @show "split W" W
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
