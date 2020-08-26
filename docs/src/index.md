@@ -2,7 +2,14 @@
 
 ## Installing SequencerJ
 
-SequencerJ is *not yet* a registered package, but installing it requires mere whispers of additional keystroke compared to those for a regular package:
+SequencerJ is *not yet* a registered package, but installing it requires mere whispers of additional keystroke beyond those for a regular package:
+
+```@repl
+    ]add "https://github.com/turingtest37/SequencerJ.jl/"
+```
+The `]` key switches the REPL into package manager mode. The `add` command accepts a URL. The  `delete` key gets you back to the REPL.
+
+Alternatively you may stay in the REPL:
 
 ```@repl
     using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
@@ -22,13 +29,37 @@ First, we need to wrangle some data to analyze. For a quick (but unpromising) st
 ```@example 1
 A = rand(100,50);
 ```
-
-Basic usage is simply:
+Basic usage of SeqeuncerJ is simply:
 ```@example 1
 r = sequence(A)
 ```
 
-As you can see, a fair amount of output is produced by default. With no other arguments, `sequence` applies all algorithms it knows to the data, each one at scales of 1, 2 and 4. Scale means the number of parts into which the data is partitioned. Each section or *chunk* contains approximately `size(A,1)/scale` elements. For example, 100 rows at scale 3 will result in chunks of 33, 33, and 34 rows.
+Results are encapsulated in a SequencerResult type.
+```@example 1
+typeof(r)
+```
+
+Use SequencerJ's accessor functions to get the details of a run. The result data sequence (1-based *column* indices, not 0-based row indices as in Sequencer for python) can be obtained with `order`.
+```@example 1
+order(r)
+```
+
+A key feature of the Sequencer algorithm is the calculated *elongation* of the minimum spanning tree that describes the best fit sequence.
+```@example 1
+elong(r)
+```
+### A Better Example
+Random data looks pretty boring from every direction, so let's apply the Sequencer to something more palatable. The `resources` folder contains test images you can use to play with Sequencer.
+
+```@example 2
+using Images
+
+```
+
+
+### Playing with scales and metrics
+
+With no other arguments, `sequence` applies all algorithms it knows to the data, each one at scales of 1, 2 and 4. Scale means the number of parts into which the data is partitioned. Each section or *chunk* contains approximately `size(A,1)/scale` elements. For example, 100 rows at scale 3 will result in chunks of 33, 33, and 34 rows.
 
 Set scale using the `scales` keyword:
 ```@example 2
@@ -37,14 +68,14 @@ r = sequence(A, scales=(1,3))
 
 Similarly, distance algorithms may be specified with the `metrics` keyword.
 ```@example 2
-r = sequence(A, scales=(1,3))
+r = sequence(A, scales=(1,3), metrics=(L2,ENERGY))
 ```
+For more on the metrics see [`Distances.SqEuclidian`](@ref), [`EMD`](@ref), [`Distances.KLDivergence`](@ref), [`Energy`](@ref) 
 
-By default, sequence prints out informative messages as it works. The `silent=true` keyword argument puts an end to that behavior.
+By default, `sequence` prints out informative messages as it works. The `silent=true` keyword argument puts an end to that behavior.
 ```@example 2
 r = sequence(A; silent=true)
 ```
-
 
 To make sense of A, we must choose which statistical distance metrics to apply. Each metric compares A pairwise, column by column, to create a distance matrix. The matrix is analyzed using graph theory to identify an *optimal* ordering of columns in A.
 
@@ -64,7 +95,6 @@ The `resources` directory contains sample images that make better target practic
 
 
 ```@example 2
- See [`Distances.SqEuclidian`](@ref), [`EMD`](@ref), [`Distances.KLDivergence`](@ref), [`Energy`](@ref) 
     julia> m = ALL_METRICS
     (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 
@@ -95,21 +125,6 @@ The `resources` directory contains sample images that make better target practic
 
 # Use accessor functions to get details of the results
 
-Elongation coefficent of the final MST
-
-    julia> elong(result)
-    3.0355999999999996
-
-Final vertex sequence (*column* indices, not row as in Sequencer for python)
-
-    julia> order(result)
-    100-element Array{Int64,1}:
-    76
-    47
-    87
-    [...]
-    79
-    83
 
  Final distance matrix   
 
@@ -164,9 +179,7 @@ In a similar fashion, get final elongations and the MST for each metric+scale
 
 
 
-## The Sequencer Algorithm
 
-The complete aogrithm
 
 [^paper]
     @misc{baron2020extracting,
