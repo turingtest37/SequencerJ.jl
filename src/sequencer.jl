@@ -70,7 +70,8 @@ and `lossfn` may be provided as e.g. `sequence(A; lossfn=L2(), [...])`.
 The provided loss function must accept two matrices as arguments.
 
     #example
-    my_loss(A,B) = 
+    using StatsBase
+    my_loss(A,B) = mean(abs.(ln.(A) .- ln(B)))
 
 See [`L2`](@Ref).
 
@@ -80,6 +81,8 @@ loss(r::SequencerResult) = r.loss
 "Sensibly display a SequencerResult object."
 show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
 
+"Convert index to weight"
+i2weight(x::AbstractVector) =  1 .- x ./ (maximum(x) + eps())
 
 """
 
@@ -112,7 +115,15 @@ on Arxiv: [https://arxiv.org/abs/2006.13948].
 TODO #22 Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
 """
-function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothing, silent=false, weightrows=false, lossfn=L2) where {T <: Real}
+function sequence(A::VecOrMat{T}; 
+    scales=(1, 4),
+    metrics=ALL_METRICS,
+    grid=nothing,
+    silent=false,
+    weightrows=false,
+    rowfn=i2weight,
+    lossfn=L2
+    ) where {T <: Real}
 
     silent && disable_logging(Logging.Error)
 
@@ -150,13 +161,14 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
     if weightrows
         currlogl = Logging.min_enabled_level(current_logger())
         # force grid back to nothing here so that row sequencing uses its own grid
-        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent)
+        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent);
         # go back to logging regularly by calling disable_logging, oddly enough
         disable_logging(currlogl)
         # get the optimal ordering for rows
-        rowseq = order(r)
+        # method call seems to work only when fully qualified. #TODO Ask someone about this on Slack..
+        rowseq = SequencerJ.order(r)
         # weights are simply the reciprocal. Maybe look at a different formula? Linear? Wr = (1 .- rowseq ./ M)
-        Wr = 1 ./ collect(1:length(rowseq))
+        Wr = rowfn(rowseq)
     end
     #row weight index; use this below to reorder Wr before chunking
     rwidx = sortperm(rowseq)
@@ -226,7 +238,7 @@ function sequence(A::VecOrMat{T}; scales=(1, 4), metrics=ALL_METRICS, grid=nothi
             EOSeg[(alg, l)] = (ηs, orderings)
             EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.1g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
+            @info "$(k) at scale $(l): η = $(@sprintf("%.2g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
         end
     end
     

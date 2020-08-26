@@ -9,6 +9,7 @@ using LightGraphs
 using SimpleWeightedGraphs
 using StatsBase: mean, ecdf, ECDF
 using LinearAlgebra: issymmetric, Symmetric, I
+
 import LightGraphs: bfs_parents, _bfs_parents
 import Base: show
 
@@ -20,7 +21,7 @@ include("sequencer.jl")
 
 # functions
 export emd, energy, cdf_distance, sequence, leastcentralpt, elongation, D, mst
-export elong, stidx, order, rollup, prettyp, loss
+export elong, stidx, order, rollup, prettyp, loss, i2weight
 
 # types
 export SequencerResult, EMD, Energy
