@@ -70,9 +70,7 @@ function EMD(u,v,uw,vw)
 end
 
 "Same as `EMD(u,v)` but using Distances-style runnable type syntax."
-function (m::EMD)(u,v=u)
-    m.grids === nothing ? EMD(u,v) : EMD(m.grids...,u,v)
-end
+(m::EMD)(u,v=u) = (m.grids === nothing) ? EMD(u,v) : EMD(m.grids...,u,v)
 
 "Same as `EMD(u,v,uw,vw)` but using Distances-style runnable type syntax."
 (::EMD)(u,v,uw,vw) = EMD(u,v,uw,vw)
@@ -98,7 +96,7 @@ emd(u,v,uw,vw) = EMD(u,v,uw,vw)
     Energy
 
 Energy distance as defined by Székely. An explicit grid may be provided. Default is 
-axes(u,1) where 
+`axes(u,1)` and `axes(v,1)`.
 
 [Energy distance](https://en.wikipedia.org/wiki/Energy_distance)
 
@@ -111,9 +109,7 @@ end
 Energy() = Energy(nothing)
 
 "Enables dispatching on the type directly"
-function (m::Energy)(u,v)
-    m.grids === nothing ? Energy(u,v) : Energy(m.grids...,u,v)
-end
+(m::Energy)(u,v) = (m.grids === nothing) ? Energy(u,v) : Energy(m.grids...,u,v)
 
 "Direct dispatch on an object of type Energy."
 (::Energy)(u,v,uw,vw) = Energy(u,v,uw,vw)
@@ -169,17 +165,15 @@ the distance is the 1 Wasserstein (or Earth Mover's) Distance.
 With p=2, the distance is Energy.
 
 References (from the stats.py source code)
-    ----------
-    [1] "Energy distance", https://en.wikipedia.org/wiki/Energy_distance
-    [2] Szekely "E-statistics: The energy of statistical samples." Bowling
-        Green State University, Department of Mathematics and Statistics,
-        Technical Report 02-16 (2002).
-    [3] Rizzo, Szekely "Energy distance." Wiley Interdisciplinary Reviews:
-        Computational Statistics, 8(1):27-38 (2015).
-    [4] Bellemare, Danihelka, Dabney, Mohamed, Lakshminarayanan, Hoyer,
-        Munos "The Cramer Distance as a Solution to Biased Wasserstein
-        Gradients" (2017). :arXiv:`1705.10743`.
-
+>    [1] "Energy distance", https://en.wikipedia.org/wiki/Energy_distance
+>    [2] Szekely "E-statistics: The energy of statistical samples." Bowling
+>        Green State University, Department of Mathematics and Statistics,
+>        Technical Report 02-16 (2002).
+>    [3] Rizzo, Szekely "Energy distance." Wiley Interdisciplinary Reviews:
+>        Computational Statistics, 8(1):27-38 (2015).
+>    [4] Bellemare, Danihelka, Dabney, Mohamed, Lakshminarayanan, Hoyer,
+>        Munos "The Cramer Distance as a Solution to Biased Wasserstein
+>        Gradients" (2017). :arXiv:`1705.10743`.
 """
 function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 

@@ -125,7 +125,7 @@ function sequence(A::VecOrMat{T};
     lossfn=L2
     ) where {T <: Real}
 
-    silent && disable_logging(Logging.Error)
+    disable_logging(silent ? Logging.Error : Logging.Info)
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
@@ -141,16 +141,17 @@ function sequence(A::VecOrMat{T};
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
     # package the arguments to be consumable as iterators
-    metrics = tuple(metrics...)
-    scales = tuple(scales...)
+    metrics = tuple(metrics)
+    scales = tuple(scales)
 
     # rows M and columns N in A
     M, N = size(A)
 
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
-
-    grid = _ensuregrid!(grid, A)
+    @debug "before ensure" grid
+    grid = ensuregrid!(A, grid)
+    @debug "after ensure" grid
 
     MST_all = []
     η_all = []
@@ -159,10 +160,17 @@ function sequence(A::VecOrMat{T};
     Wr = ones(M) # identity
     rowseq = collect(1:M) # row indices for applying row weight to column vectors
     if weightrows
-        currlogl = Logging.min_enabled_level(current_logger())
+        cl = current_logger()
+        @debug "w/ weightrows=true, before sequence" cl
+        currlogl = Logging.min_enabled_level(cl)
+        @debug "w/ weightrows=true, before sequence" currlogl
         # force grid back to nothing here so that row sequencing uses its own grid
         r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent);
         # go back to logging regularly by calling disable_logging, oddly enough
+        cl = current_logger()
+        @debug "w/ weightrows=true, after sequence" cl
+        currlogl = Logging.min_enabled_level(cl)
+        @debug "w/ weightrows=true, after sequence" currlogl
         disable_logging(currlogl)
         # get the optimal ordering for rows
         # method call seems to work only when fully qualified. #TODO Ask someone about this on Slack..
@@ -192,14 +200,16 @@ function sequence(A::VecOrMat{T};
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
                 m, lgrid = S[i], G[i]
+                @debug "after splitting" m, lgrid
                 # Some algorithms can be performed on arbitrary real-valued grids
                 if alg in (EMD, Energy)
+                    @debug "adding local grid to alg" alg lgrid
                     alg = alg((lgrid, lgrid))
                 end
                 # Weight the columns by the appropriate row weights (default = 1)
-                # @show "W[i] m[:,1:end]" W[i] m[:,1:end]
+                # @debug "W[i] m[:,1:end]" W[i] m[:,1:end]
                 mp = W[i] .* m[:,1:end]
-                # @show "W[i] .* m[:,1:end]" mp
+                # @debug "W[i] .* m[:,1:end]" mp
                 m .= mp
                 # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
 
@@ -250,20 +260,21 @@ function sequence(A::VecOrMat{T};
     D = inv.(Pw)
     # final minimum spanning tree for analysis
     mstD, stidx, ηD, bfstD = _measure_dm(D)
-    @info "Final average elongation: $(@sprintf("%.4g", ηD))"
     # convert the final sequence from tree form into an ordered vector of vertices.
     order = unroll(bfstD, stidx)
     # head = round.(collect(order[1:5]); digits=2)
     # tail = round.(collect(order[end-5:end]); digits=2)
     # s = join(string(head),",") * "..." * join(string(tail),",")
     loss = lossfn(A, A[:,order])
-    @info "Final ordering: $(prettyp(order))\nloss=$(loss)"
+    @info "Result: η = $(@sprintf("%.4g", ηD)) loss = $(loss) sequence = $(prettyp(order,5))"
     return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order, loss)
 end
-#@TODO #20
 
-"Evaluate a given distance matrix and return its MST graph, elongation, and optimal ordering of vertices. Each vertex
-in the result corresponds to a column of data in D."
+"""
+# Internal use only
+Evaluate a given distance matrix and return its MST graph, elongation, and optimal ordering of vertices. Each vertex
+in the result corresponds to a column of data in D.
+"""
 function _measure_dm(D::AbstractMatrix)
     g = _mst(D) # minimum spanning tree for D
     stidx = leastcentralpt(g) # Least central point of MST
@@ -273,8 +284,8 @@ function _measure_dm(D::AbstractMatrix)
 end
 
 
-"Ensure the size of the grid is compatible with the data. Create a grid if one was not provided."
-function _ensuregrid!(grid, A)::AbstractVector
+"Ensure the size of the grid is compatible with the data in A. Create a grid if one was not provided."
+function ensuregrid!(A, grid=nothing)::AbstractVector
     if isnothing(grid)
         # create a sensible grid if one was not provided
         grid = float(collect(axes(A, 1)))
