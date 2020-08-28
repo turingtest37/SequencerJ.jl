@@ -86,15 +86,23 @@ i2weight(x::AbstractVector) =  1 .- x ./ (maximum(x) + eps())
 
 """
 
-    sequence(A::VecOrMat{T};) where {T <: Real}
+    sequence(A::VecOrMat{T}; 
+        scales=(1, 4),
+        metrics=ALL_METRICS,
+        grid=nothing,
+        silent=false,
+        weightrows=false,
+        rowfn=i2weight,
+        lossfn=L2
+        ) where {T <: Real}
 
 Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
 each column of data, possibly after dividing the data into smaller row sets. Columns are compared pairwise for each combination 
 of metric and scale to create a n x n distance matrix that is analyzed as a graph using a novel algorithm. Details of the algorithm
 are provided in the paper by D. Baron and B. Ménard that is cited below.
 
-```julia-repl
-julia> sequence(A; metrics=(WASS1D,), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
+```julia
+    julia> sequence(A; metrics=(WASS1D,L2), grid=collect(0.5:0.5:size(A,1))) # grid must equal the size of A along dim 1
 ```
 
 The paper that describes the Sequencer algorithm and its applications can be found 
@@ -114,6 +122,12 @@ on Arxiv: [https://arxiv.org/abs/2006.13948].
 
 TODO #22 Add support for auto-scaling: need rule, e.g. 2^n up to n < log2(N) / 2
 
+Note: if you want to specify only one metric, you must wrap it in a 1-tuple.
+e.g. to use only KL Divergence, write:
+```julia-repl
+    sequence(A, metrics=(KLD,), [...])
+```
+
 """
 function sequence(A::VecOrMat{T}; 
     scales=(1, 4),
@@ -125,7 +139,7 @@ function sequence(A::VecOrMat{T};
     lossfn=L2
     ) where {T <: Real}
 
-    disable_logging(silent ? Logging.Error : Logging.Info)
+    # disable_logging(silent ? Logging.Error : Logging.Info)
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
@@ -140,9 +154,13 @@ function sequence(A::VecOrMat{T};
 # observed data were captured.
     # take a vector of vectors and cat it into a matrix
     A = A isa Vector ? hcat(A...) : A
+
     # package the arguments to be consumable as iterators
-    metrics = tuple(metrics)
-    scales = tuple(scales)
+    tuplify(x::PreMetric) = tuple(x)
+    tuplify(x) = tuple(x...)
+    
+    metrics = tuplify(metrics)
+    scales = tuplify(scales)
 
     # rows M and columns N in A
     M, N = size(A)
@@ -182,7 +200,7 @@ function sequence(A::VecOrMat{T};
     rwidx = sortperm(rowseq)
 
     @inbounds for k in metrics
-        alg = k
+        alg = nothing
         for l in scales
 
             # summary distance matrix for segments
@@ -200,12 +218,16 @@ function sequence(A::VecOrMat{T};
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
                 m, lgrid = S[i], G[i]
-                @debug "after splitting" m, lgrid
+                @debug "after splitting" size(m), size(lgrid)
                 # Some algorithms can be performed on arbitrary real-valued grids
-                if alg in (EMD, Energy)
-                    @debug "adding local grid to alg" alg lgrid
-                    alg = alg((lgrid, lgrid))
+                @debug "k" k
+                if k in (EMD, Energy)
+                    @debug "adding local grid to alg" k lgrid
+                    alg = k((lgrid, lgrid))
+                else
+                    alg = k
                 end
+                @debug "alg" alg
                 # Weight the columns by the appropriate row weights (default = 1)
                 # @debug "W[i] m[:,1:end]" W[i] m[:,1:end]
                 mp = W[i] .* m[:,1:end]
@@ -248,7 +270,7 @@ function sequence(A::VecOrMat{T};
             EOSeg[(alg, l)] = (ηs, orderings)
             EOAlgScale[(alg, l)] = (ηkl, BFSkl)
 
-            @info "$(k) at scale $(l): η = $(@sprintf("%.2g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
+            @info "$(k) at scale $(l): η = $(@sprintf("%.4g", ηkl)) ($(@sprintf("%.2g", tt))s)"        
         end
     end
     
@@ -266,7 +288,7 @@ function sequence(A::VecOrMat{T};
     # tail = round.(collect(order[end-5:end]); digits=2)
     # s = join(string(head),",") * "..." * join(string(tail),",")
     loss = lossfn(A, A[:,order])
-    @info "Result: η = $(@sprintf("%.4g", ηD)) loss = $(loss) sequence = $(prettyp(order,5))"
+    @info "Result: η = $(@sprintf("%.4g", ηD)) loss = $(@sprintf("%.4g", loss)) sequence = $(prettyp(order,5))"
     return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order, loss)
 end
 
