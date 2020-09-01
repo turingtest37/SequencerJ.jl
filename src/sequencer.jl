@@ -27,7 +27,6 @@ struct SequencerResult
     mst::LightGraphs.AbstractGraph # final mst
     η::Real # final elongation
     order::AbstractVector #final ordering from bfs
-    loss::Real
 end
 
 """
@@ -62,22 +61,6 @@ Return the result column indices, as determined by the Sequencer algorithm.
 """
 order(r::SequencerResult) = r.order
 
-"""
-
-Return the result of `lossfn(A, A[:,order])`, where `order` is the final sequence extracted from A,
-and `lossfn` may be provided as e.g. `sequence(A; lossfn=L2(), [...])`.
-
-The provided loss function must accept two matrices as arguments.
-
-    #example
-    using StatsBase
-    my_loss(A,B) = mean(abs.(ln.(A) .- ln(B)))
-
-See [`L2`](@Ref).
-
-"""
-loss(r::SequencerResult) = r.loss
-
 "Sensibly display a SequencerResult object."
 show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
 
@@ -93,7 +76,6 @@ i2weight(x::AbstractVector) =  1 .- x ./ (maximum(x) + eps())
         silent=false,
         weightrows=false,
         rowfn=i2weight,
-        lossfn=L2
         ) where {T <: Real}
 
 Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
@@ -136,7 +118,6 @@ function sequence(A::VecOrMat{T};
     silent=false,
     weightrows=false,
     rowfn=i2weight,
-    lossfn=L2
     ) where {T <: Real}
 
     # disable_logging(silent ? Logging.Error : Logging.Info)
@@ -284,12 +265,8 @@ function sequence(A::VecOrMat{T};
     mstD, stidx, ηD, bfstD = _measure_dm(D)
     # convert the final sequence from tree form into an ordered vector of vertices.
     order = unroll(bfstD, stidx)
-    # head = round.(collect(order[1:5]); digits=2)
-    # tail = round.(collect(order[end-5:end]); digits=2)
-    # s = join(string(head),",") * "..." * join(string(tail),",")
-    loss = lossfn(A, A[:,order])
-    @info "Result: η = $(@sprintf("%.4g", ηD)) loss = $(@sprintf("%.4g", loss)) sequence = $(prettyp(order,5))"
-    return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order, loss)
+    @info "Result: η = $(@sprintf("%.4g", ηD)) sequence = $(prettyp(order,5))"
+    return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order)
 end
 
 """
