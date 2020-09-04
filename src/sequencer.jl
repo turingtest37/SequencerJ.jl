@@ -225,8 +225,8 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
             tt = @elapsed for i in eachindex(S, G, W)
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
-                m, lgrid = S[i], G[i]
-                @debug "after splitting" size(m), size(lgrid)
+                chunk, lgrid = S[i], G[i]
+                @debug "after splitting" size(chunk), size(lgrid)
                 # Some algorithms can be performed on arbitrary real-valued grids
                 @debug "k" k
                 if k in (EMD, Energy)
@@ -238,13 +238,13 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
                 @debug "alg" alg
                 # Weight the columns by the appropriate row weights (default = 1)
                 # @debug "W[i] m[:,1:end]" W[i] m[:,1:end]
-                mp = W[i] .* m[:,1:end]
+                chunk[:,1:end] .= W[i] .* chunk[:,1:end]
                 # @debug "W[i] .* m[:,1:end]" mp
-                m .= mp
+                # m .= mp
                 # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
 
                 # All the heavy lifting happens here, in the distance calculations
-                Dklm = abs.(pairwise(alg, m; dims=2)) .+ ϵ
+                Dklm = Array(abs.(pairwise(alg, wrap(chunk); dims=2)) .+ ϵ)
 
                 # Measure our per-metric, per-scale, per-segment distance matrix
                 MSTklm, _, η, bfso = _measure_dm(Dklm)

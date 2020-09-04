@@ -4,6 +4,8 @@ authors = ["a5vzener <c.difficile@gmail.com> and contributors"]
 version = "0.2.0"
 
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 GraphIO = "aa1b3936-2fda-51b9-ab35-c553d3a640a2"
 LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
