@@ -29,6 +29,9 @@ struct SequencerResult
     order::AbstractVector #final ordering from bfs
 end
 
+"Alias for elong"
+η(r::SequencerResult) = elong(r)
+
 """
 
     D(r::SequencerResult)
@@ -112,15 +115,13 @@ e.g. to use only KL Divergence, write:
 
 """
 function sequence(A::VecOrMat{T}; 
-    scales=(1, 4),
+    scales=nothing, #auto-scale by default
     metrics=ALL_METRICS,
     grid=nothing,
     silent=false,
     weightrows=false,
     rowfn=i2weight,
     ) where {T <: Real}
-
-    # disable_logging(silent ? Logging.Error : Logging.Info)
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
 
@@ -140,17 +141,52 @@ function sequence(A::VecOrMat{T};
     tuplify(x::PreMetric) = tuple(x)
     tuplify(x) = tuple(x...)
     
-    metrics = tuplify(metrics)
-    scales = tuplify(scales)
-
-    # rows M and columns N in A
-    M, N = size(A)
-
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
     @debug "before ensure" grid
     grid = ensuregrid!(A, grid)
     @debug "after ensure" grid
+
+    metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
+    @show metrics
+    scales = (scales === nothing) ? tuplify(_bestscale(A, metrics, grid, (silent, weightrows, rowfn))) : tuplify(scales)
+    @show scales
+
+    return _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
+
+end
+
+"The scales used in the autoscale option"
+const FIB = [1,2,3,5,8,13,21,34,55,89,144,233,377]
+
+"Sample columns of A and run the Sequencer algorithm against this subspace to identify the 
+scale at which elongation is greatest. Scales are members of the Fibonacci series, e.g. 1,2,3,5,8,13..."
+function _bestscale(A, m, g, params)
+    M,N = size(A)
+    Ŋ = N ÷ 10  # nb of column samples. CAN THIS BE SMALLER?
+    sampidx = sample(collect(axes(A,2)), (Ŋ,), ordered=true)
+    Asamp = view(A, :, sampidx)
+    minscale = 1
+    maxscale = M ÷ 10 # no fewer than 10 rows = observations
+    testscales = filter(i->i < maxscale, FIB)
+    bestscale = 1
+    max_η = 0
+    for s in testscales
+        r = _sequence(Asamp, s, m, g, params...)
+        η = elong(r)
+        if η > max_η
+            max_η = η
+            bestscale = s
+        end
+    end
+    return bestscale
+end
+
+
+function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
+
+    # rows M and columns N in A
+    M, N = size(A)
 
     MST_all = []
     η_all = []
@@ -159,20 +195,11 @@ function sequence(A::VecOrMat{T};
     Wr = ones(M) # identity
     rowseq = collect(1:M) # row indices for applying row weight to column vectors
     if weightrows
-        cl = current_logger()
-        @debug "w/ weightrows=true, before sequence" cl
-        currlogl = Logging.min_enabled_level(cl)
-        @debug "w/ weightrows=true, before sequence" currlogl
         # force grid back to nothing here so that row sequencing uses its own grid
-        r = sequence(permutedims(A), scales=scales, metrics=metrics, grid=nothing, weightrows=false, silent=silent);
-        # go back to logging regularly by calling disable_logging, oddly enough
-        cl = current_logger()
-        @debug "w/ weightrows=true, after sequence" cl
-        currlogl = Logging.min_enabled_level(cl)
-        @debug "w/ weightrows=true, after sequence" currlogl
-        disable_logging(currlogl)
+        # use all metrics at scale 1 for rows
+        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false, silent=silent);
         # get the optimal ordering for rows
-        # method call seems to work only when fully qualified. #TODO Ask someone about this on Slack..
+        # method call seems to work only when fully qualified.
         rowseq = SequencerJ.order(r)
         # weights are simply the reciprocal. Maybe look at a different formula? Linear? Wr = (1 .- rowseq ./ M)
         Wr = rowfn(rowseq)
@@ -265,7 +292,7 @@ function sequence(A::VecOrMat{T};
     mstD, stidx, ηD, bfstD = _measure_dm(D)
     # convert the final sequence from tree form into an ordered vector of vertices.
     order = unroll(bfstD, stidx)
-    @info "Result: η = $(@sprintf("%.4g", ηD)) sequence = $(prettyp(order,5))"
+    @info "Final: η = $(@sprintf("%.4g", ηD)) sequence = $(prettyp(order,5))"
     return SequencerResult(EOSeg, EOAlgScale, D, mstD, ηD, order)
 end
 
@@ -286,7 +313,6 @@ end
 "Ensure the size of the grid is compatible with the data in A. Create a grid if one was not provided."
 function ensuregrid!(A, grid=nothing)::AbstractVector
     if isnothing(grid)
-        # create a sensible grid if one was not provided
         grid = float(collect(axes(A, 1)))
     elseif !(eltype(grid) isa AbstractFloat)
         grid = float(grid)

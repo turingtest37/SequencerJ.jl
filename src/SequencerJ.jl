@@ -1,14 +1,15 @@
 module SequencerJ
 
-using Logging
-using Printf: @sprintf
 using Reexport
 @reexport using Distances
+@reexport using Logging
+using Printf: @sprintf
 using SparseArrays: sparse, spzeros
 using LightGraphs
 using SimpleWeightedGraphs
-using StatsBase: mean, ecdf, ECDF
+using StatsBase: mean, ecdf, ECDF, sample
 using LinearAlgebra: issymmetric, Symmetric, I
+
 
 import LightGraphs: bfs_parents, _bfs_parents
 import Base: show
