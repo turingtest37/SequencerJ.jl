@@ -237,14 +237,12 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
                 end
                 @debug "alg" alg
                 # Weight the columns by the appropriate row weights (default = 1)
-                # @debug "W[i] m[:,1:end]" W[i] m[:,1:end]
                 chunk[:,1:end] .= W[i] .* chunk[:,1:end]
-                # @debug "W[i] .* m[:,1:end]" mp
-                # m .= mp
-                # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
 
                 # All the heavy lifting happens here, in the distance calculations
-                Dklm = Array(abs.(pairwise(alg, wrap(chunk); dims=2)) .+ ϵ)
+                Dklm = Array{Float32}(undef, size(chunk, 2), size(chunk, 2)) 
+                pairwise!(Dklm, alg, wrap(chunk); dims=2)
+                map!(x->abs(x)+ϵ, Dklm, Dklm)
 
                 # Measure our per-metric, per-scale, per-segment distance matrix
                 MSTklm, _, η, bfso = _measure_dm(Dklm)
