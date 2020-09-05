@@ -143,17 +143,12 @@ function sequence(A::VecOrMat{T};
     
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
-    @debug "before ensure" grid
+
     grid = ensuregrid!(A, grid)
-    @debug "after ensure" grid
-
     metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
-    @show metrics
-    scales = (scales === nothing) ? tuplify(_bestscale(A, metrics, grid, (silent, weightrows, rowfn))) : tuplify(scales)
-    @show scales
+    scales = (scales === nothing) ? tuplify(_bestscale(A, metrics, grid, (weightrows, rowfn))) : tuplify(scales)
 
-    return _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
-
+    return _seq(A, scales, metrics, grid, weightrows, rowfn)
 end
 
 "The scales used in the autoscale option"
@@ -172,7 +167,7 @@ function _bestscale(A, m, g, params)
     bestscale = 1
     max_η = 0
     for s in testscales
-        r = _sequence(Asamp, s, m, g, params...)
+        r = _seq(Asamp, s, m, g, params...)
         η = elong(r)
         if η > max_η
             max_η = η
@@ -183,7 +178,7 @@ function _bestscale(A, m, g, params)
 end
 
 
-function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
+function _seq(A, scales, metrics, grid, weightrows, rowfn)
 
     # rows M and columns N in A
     M, N = size(A)
@@ -197,7 +192,7 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
     if weightrows
         # force grid back to nothing here so that row sequencing uses its own grid
         # use all metrics at scale 1 for rows
-        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false, silent=silent);
+        r = _seq(permutedims(A), (1,), ALL_METRICS, nothing, false, rowfn);
         # get the optimal ordering for rows
         # method call seems to work only when fully qualified.
         rowseq = SequencerJ.order(r)
