@@ -241,7 +241,7 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
 
                 # All the heavy lifting happens here, in the distance calculations
                 Dklm = Array{Float32}(undef, size(chunk, 2), size(chunk, 2)) 
-                pairwise!(Dklm, alg, wrap(chunk); dims=2)
+                pairwise!(wrap(Dklm), alg, wrap(chunk); dims=2)
                 map!(x->abs(x)+ϵ, Dklm, Dklm)
 
                 # Measure our per-metric, per-scale, per-segment distance matrix
