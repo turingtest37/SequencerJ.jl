@@ -192,7 +192,7 @@ function _seq(A, scales, metrics, grid, weightrows, rowfn)
     if weightrows
         # force grid back to nothing here so that row sequencing uses its own grid
         # use all metrics at scale 1 for rows
-        r = _seq(permutedims(A), (1,), ALL_METRICS, nothing, false, rowfn);
+        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false, rowfn=rowfn);
         # get the optimal ordering for rows
         # method call seems to work only when fully qualified.
         rowseq = SequencerJ.order(r)
@@ -232,11 +232,13 @@ function _seq(A, scales, metrics, grid, weightrows, rowfn)
                 end
                 @debug "alg" alg
                 # Weight the columns by the appropriate row weights (default = 1)
-                chunk[:,1:end] .= W[i] .* chunk[:,1:end]
+                chunk = W[i] .* chunk
+                M,N = size(chunk)
 
                 # All the heavy lifting happens here, in the distance calculations
-                Dklm = Array{Float32}(undef, size(chunk, 2), size(chunk, 2)) 
+                Dklm = Array{Float32}(undef,(N,N)) 
                 pairwise!(wrap(Dklm), alg, wrap(chunk); dims=2)
+                # club membership is very selective. no zeros or negatives allowed.
                 map!(x->abs(x)+ϵ, Dklm, Dklm)
 
                 # Measure our per-metric, per-scale, per-segment distance matrix
@@ -391,18 +393,21 @@ function _splitnorm(A::AbstractMatrix{T}, grid, rw, scale) where {T <: Real}
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
 
     M = size(A, 1)
-    # break up each column of A into  chunks
+    @show M
     chunklen = cld(M, scale)
+    @show chunklen
     slices = []
     grids = []
     weights = []
 
     chunkstrt = 1:chunklen:M # the starting indices for each chunk
+    @show chunkstrt
 
     for i in chunkstrt
         ii = i + chunklen - one(i) # the end index for the chunk
         ii = clamp(ii, one(ii), M)  # keepin' it real....
         S = A[i:ii, :] # a subset of rows, all columns
+        @show grid i ii
         G = grid[i:ii]
         W = rw[i:ii]
         # now normalize each column of the slice
@@ -412,7 +417,7 @@ function _splitnorm(A::AbstractMatrix{T}, grid, rw, scale) where {T <: Real}
         push!(weights, W)
     end
     return slices, grids, weights
-    end
+end
 
 EOSeg = Dict{Tuple,Any}() # Dictionary of per-segment intermediate elongation and sequence results
 EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
