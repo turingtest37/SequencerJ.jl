@@ -191,7 +191,7 @@ function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 
 # Shortcut return in case the grids are identical
     if uv == vv # we can safely remove zeros from the delta
-        Δx = filter(v->!iszero(v), Δx)
+        filter!(v->!iszero(v), Δx)
         UA = u(uv) # calculate u,v CDFs on their separate grids
         VA = v(vv)
     else
