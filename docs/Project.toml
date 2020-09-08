@@ -1,4 +1,6 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
-SequencerJulia = "348581b9-6e84-42e0-ac4e-fe9177c221e6"
+QuartzImageIO = "dca85d43-d64c-5e67-8c65-017450d5d020"
+SequencerJ = "348581b9-6e84-42e0-ac4e-fe9177c221e6"

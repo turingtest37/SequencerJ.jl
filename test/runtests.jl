@@ -15,13 +15,13 @@ using Images
     loss(A,B) = L2(A, B)
 
     imgsmall = Gray.(load(joinpath(@__DIR__,"..","resources","colony.png")))
-    SMALL = convert(Matrix{Float32}, float32.(imgsmall))
+    SMALL = convert(Matrix{Float32}, imgsmall)
 
     imgmed = Gray.(load(joinpath(@__DIR__,"..","resources","Aged Whisky.jpg")));
-    MED = convert(Matrix{Float32}, float32.(imgmed))
+    MED = convert(Matrix{Float32}, imgmed)
 
     imgbig = Gray.(load(joinpath(@__DIR__,"..","resources","Hummingbird!.jpeg")))
-    BIG = convert(Matrix{Float32}, float32.(imgbig))
+    BIG = convert(Matrix{Float32}, imgbig)
 
     @testset "real image does not fail." begin
         @test sequence(SMALL; scales=[2]) !== nothing

@@ -1,10 +1,10 @@
 # Metrics
 
 ```@meta
-CurrentModule = SequencerJulia
+CurrentModule = SequencerJ
 ```
 
 ```@autodocs
-Modules=[SequencerJulia, Distances]
+Modules=[SequencerJ, Distances]
 Pages=["distancemetrics.jl"]
 ```

@@ -1,10 +1,10 @@
 # API
 
 ```@meta
-CurrentModule = SequencerJulia
+CurrentModule = SequencerJ
 ```
 
 ```@autodocs
-Modules=[SequencerJulia]
-Pages=["SequencerJulia.jl", "sequencer.jl", "bfs.jl", "utils.jl"]
+Modules=[SequencerJ, Distances]
+Pages=["SequencerJ.jl", "sequencer.jl", "bfs.jl", "utils.jl", "distancemetrics.jl"]
 ```

@@ -2,12 +2,13 @@ using Documenter
 using SequencerJ
 
 makedocs(
-    sitename = "SequencerJulia",
+    sitename = "SequencerJ",
     format = Documenter.HTML(),
-    modules = [SequencerJulia],
+    modules = [SequencerJ],
     pages = [
-        "Quick Start" => "index.md",
+        "ABCs of SequencerJ" => "index.md",
         "Metrics" => "algorithms.md",
+        "Examples" => "examples.md",
         "API" => "api.md"
     ]
 )

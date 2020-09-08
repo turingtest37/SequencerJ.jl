@@ -4,19 +4,19 @@
 
 SequencerJ is *not yet* a registered package, but installing it requires mere whispers of additional keystroke beyond those for a regular package:
 
-```@repl
-    ]add "https://github.com/turingtest37/SequencerJ.jl/"
+```
+`]`add "https://github.com/turingtest37/SequencerJ.jl/"
 ```
 The `]` key switches the REPL into package manager mode. The `add` command accepts a URL. The  `delete` key gets you back to the REPL.
 
 Alternatively you may stay in the REPL:
 
 ```@repl
-    using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
-    [...]
-    using SequencerJ
-    [ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
-    [...]
+using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
+[...]
+using SequencerJ
+[ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
+[...]
 ```
 You may get **WARN**INGs upon compilation. You can safely ignore them for most purposes, but if you are developing SequencerJ locally and use the `Revise` package, note that you may have to restart your Julia environment more often than usual.
 
@@ -27,35 +27,89 @@ Getting started with SequencerJ is straightforward:
 
 First, we need to wrangle some data to analyze. For a quick (but unpromising) start, let's use a random array.
 ```@example 1
-A = rand(100,50);
-```
-Basic usage of SeqeuncerJ is simply:
-```@example 1
+A = rand(100,50); #hide
 r = sequence(A)
 ```
+The `sequence` method is the primary interface to SequencerJ. Only the input matrix or vector A is required. All other options use their defaults: `scales=nothing` enables autoscaling to find the best row segmentation; `metrics=ALL_METRICS` enables all supported measurement; `grid=nothing` forces automatic grid creation.
+See [`sequence(A;)`](@ref)
 
-Results are encapsulated in a SequencerResult type.
+Data and statistics from a sequencing run are encapsulated in a [`SequencerResult`](@ref).
 ```@example 1
 typeof(r)
 ```
 
-Use SequencerJ's accessor functions to get the details of a run. The result data sequence (1-based *column* indices, not 0-based row indices as in Sequencer for python) can be obtained with `order`.
+Use SequencerJ's accessor functions to get the details of a run. The result data sequence (1-based *column* indices, not 0-based row indices as in Sequencer for python) can be obtained with [`order`]@ref.
 ```@example 1
 order(r)
 ```
 
-A key feature of the Sequencer algorithm is the calculated *elongation* of the minimum spanning tree that describes the best fit sequence.
+A key feature of the Sequencer algorithm is the calculated *elongation* of the minimum spanning tree that describes the best fit sequence. See [`elong`](@ref)
 ```@example 1
 elong(r)
 ```
 ### A Better Example
-Random data looks pretty boring from every direction, so let's apply the Sequencer to something more palatable. The `resources` folder contains test images you can use to play with Sequencer.
+Random data looks pretty boring from every direction, so let's apply the Sequencer to something more enjoyable: trying to put back together an image whose columns (of pixels) have been shuffled. This trick will even impress your mom!
+
+The `resources` folder contains test images you can use to play with SequencerJ.
 
 ```@example 2
-using Images
-
+using SequencerJ #hide
+using Images #hide
+img = load(joinpath(@__DIR__, "resources","bread.jpeg"))
 ```
 
+Color is nice but grayscale is easier.
+
+```@example 2
+imgg = (Gray.(img))
+```
+
+Let's slice up this loaf of bread, but not with a serrated knife...
+
+```@example 2
+A = convert(Matrix{Float32}, imgg);
+shuff_idx = shuffle(axes(A,2))
+```
+
+Applying the shuffled index to the bread image columns creates a lot of crumbs...
+
+```@example 2
+As = A[:, shuff_idx]
+colorview(Gray, As)
+```
+
+Now let SequencerJ put back together the pieces, without cheating! First,
+run SequencerJ against the shuffled matrix. I chose KLD and L2 because I know they work well on image data. Please experiment!
+
+```@example 2
+seqres = sequence(As, metrics=(KLD, L2)) #hide
+```
+
+It's not printed here, but the Sequencer outputs log messages as it works. For a more 
+silent treatment, try:
+
+```@example 2
+using Logging; disable_logging(Logging.Error)
+seqres = sequence(As, metrics=(KLD, L2)) #hide
+disable_logging(Logging.Info) # put it back!
+```
+
+The `SequencerResult` object contains the data we need to piece back together our loaf of bread.
+
+```@example 2
+bestguessidx = SequencerJ.order(seqres)
+colorview(Gray, As[:, bestguessidx])
+```
+
+The Sequencer sometimes fails to reassemble images completely. Usually this is because the
+images are too small along the row dimension and therefore do not contain enough data to allow the algorithm to discriminate correctly between similar columns of data. To ensure best performance, images should be presented in "portrait" mode, with more rows than columns. Let's do that.
+
+```@example 2
+permutedims!(As) #hide
+seqres = sequence(As, metrics=(KLD, L2)) #hide
+betterguessidx = SequencerJ.order(seqres) #hide
+colorview(Gray, As[:, bestguessidx])
+```
 
 ### Playing with scales and metrics
 
