@@ -55,7 +55,7 @@ The `resources` folder contains test images you can use to play with SequencerJ.
 ```@example 2
 using SequencerJ #hide
 using Images #hide
-img = load(joinpath(@__DIR__, "resources","bread.jpeg"))
+img = load(joinpath(@__DIR__, "..", "..","resources","bread.jpeg"))
 ```
 
 Color is nice but grayscale is easier.
@@ -64,7 +64,7 @@ Color is nice but grayscale is easier.
 imgg = (Gray.(img))
 ```
 
-Let's slice up this loaf of bread, but not with a serrated knife...
+Let's slice up this loaf of bread with a different kind of knife...
 
 ```@example 2
 A = convert(Matrix{Float32}, imgg);

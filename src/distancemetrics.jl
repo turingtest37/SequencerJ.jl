@@ -3,11 +3,22 @@
 const ϵ = 1e-6
 
 """
-
     EMD
 
-Earth Mover's Distance, a.k.a. 1-p Monge-Wasserstein distance
+Earth Mover's Distance, a.k.a. 1-p Monge-Wasserstein distance. The algorithm as 
+implemented here assumes balanced transport where both vectors have the same statistical mass
+(they both sum to 1). Input vectors should be normalized to sum to 1.
 
+`EMD` implements the Distances package convention of runnable types:
+
+```@example
+u = rand(10);
+u .= u / sum(u);
+sum(u)
+v = rand(10);
+v .= v / sum(v);
+d = EMD()(u,v)
+```
 """
 struct EMD <: SemiMetric
     grids::Union{Nothing,Tuple}
@@ -24,7 +35,6 @@ Calculate the Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
 between the two given vectors, accepting a default grid. `u` and `v` are treated as 
 weights on the grid. The default grid is equal to the first axis of `u` and `v`.
 
-This function is not intended to be called directly. Instead, use WASS1D.
 """
 function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
     gridu = collect(first(axes(u)))
