@@ -9,16 +9,6 @@ Earth Mover's Distance, a.k.a. 1-p Monge-Wasserstein distance. The algorithm as
 implemented here assumes balanced transport where both vectors have the same statistical mass
 (they both sum to 1). Input vectors should be normalized to sum to 1.
 
-`EMD` implements the Distances package convention of runnable types:
-
-```@example
-u = rand(10);
-u .= u / sum(u);
-sum(u)
-v = rand(10);
-v .= v / sum(v);
-d = EMD()(u,v)
-```
 """
 struct EMD <: SemiMetric
     grids::Union{Nothing,Tuple}
@@ -34,6 +24,20 @@ EMD() = EMD(nothing)
 Calculate the Earth Mover Distance (EMD) a.k.a the 1-Wasserstein distance
 between the two given vectors, accepting a default grid. `u` and `v` are treated as 
 weights on the grid. The default grid is equal to the first axis of `u` and `v`.
+
+```@example 1
+u = rand(10);
+u .= u / sum(u);
+sum(u)
+```
+
+`EMD` implements the Distances package convention of runnable types:
+
+```@example 1
+v = rand(10);
+v .= v / sum(v);
+d = EMD()(u,v)
+```
 
 """
 function EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
@@ -156,15 +160,11 @@ end
 
 """
 Convenience function for Energy with a supplied grid.
-
-See [`Energy(u,v,uw,vw)`](@ref)
 """
 energy(u, v, uw, vw) = Energy(u, v, uw, vw)
 
 """
 Convenience function for Energy with a default unit grid.
-
-    See [`Energy(u,v)`](@ref)
 """
 energy(u::AbstractVector, v=u) = Energy(u,v)
 
@@ -223,38 +223,25 @@ end
 
 """
 Constant to use when specifying the Square Euclidean or L2 distance metric for a sequencing run.
-
-    The L2 metric measures the sum of squares of the Euclidean or Manhattan-style 
-    distance between two vectors of values. Because it operates only on values and not 
-    on their underlying grid or axis, the L2 metric is less sensitive to the positions of  
-    values along their grid than the EMD and Energy metrics.
-    ``
-        L2(x,y) = Σ ||x - y||²
-    ``
-
-See [`SqEuclidean()`](@ref)
 """
 const L2 = Distances.SqEuclidean()
 
 """
-Kullbach-Leibler Divergence metric.
-
-See [`KLDivergence()`](@ref)
+Constant for specifiying the Kullbach-Leibler Divergence metric.
 """
 const KLD = Distances.KLDivergence()
 
 """
-Monge-Wasserstein a.k.a. 1-p Wasserstein a.k.a. Earth Mover's Distance (EMD) metric. Sensitive to underlying 
-grid. Default is unit grid taken from the axes of the data vector.
+Constant for specifiying the Monge-Wasserstein a.k.a. 1-p Wasserstein a.k.a. Earth Mover's Distance (EMD) metric.
+This metric is sensitive to the underlying grid. Default is unit grid taken from the axes of the data vector.
 """
 const WASS1D = EMD()
 
 """
-#TODO Fix this comment. Energy metric as defined by Szekely. (CHECK)
-
-[wikipedia article](https://en.wikipedia.org/wiki/Energy_distance)
+Constant for specifiying the Energy distance as defined by Székely.
+[Wikipedia article](https://en.wikipedia.org/wiki/Energy_distance)
 """
 const ENERGY = Energy()
 
-"Convenience constant to represent L2, WASS1D, KLD, and ENERGY."
+"Convenience constant to represent all of L2, WASS1D, KLD, and ENERGY."
 const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)

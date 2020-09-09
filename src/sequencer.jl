@@ -4,7 +4,7 @@
 Contains the results of a Sequencer run. Use the returned object to obtain details
 about the run results by calling the appropriate function.
 
-```julia-repl
+```julia
 
 julia> r = sequence(A; metrics=ALL_METRICS, scales=(1,2,4))
 ┌ Info: Sequencing data with
@@ -18,6 +18,7 @@ julia> elong(r)
 julia> order(r)
 100-element Array{Int64,1}:
 [...]
+
 ```
 """
 struct SequencerResult
