@@ -167,12 +167,13 @@ function sequence(A::VecOrMat{T};
     @debug "after ensure" grid
 
     metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
-    @show metrics
-    scales = (scales === nothing) ? tuplify(_bestscale(A, metrics, grid, (silent, weightrows, rowfn))) : tuplify(scales)
-    @show scales
+    if scales === nothing
+        scales = _bestscale(A, metrics, grid, (silent, weightrows, rowfn))
+        @info "After autoscaling, best scale = $(scales)..."
+    end
+    scales = tuplify(scales)
 
     return _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
-
 end
 
 "The scales used in the autoscale option"
@@ -201,7 +202,9 @@ function _bestscale(A, m, g, params)
     return bestscale
 end
 
-
+"""
+The full algorithm. For internal use only.
+"""
 function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
 
     # rows M and columns N in A
@@ -316,20 +319,23 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
 end
 
 """
-# Internal use only
 Evaluate a given distance matrix and return its MST graph, elongation, and optimal ordering of vertices. Each vertex
 in the result corresponds to a column of data in D.
+
+Internal use only.
 """
 function _measure_dm(D::AbstractMatrix)
     g = _mst(D) # minimum spanning tree for D
-    stidx = leastcentralpt(g) # Least central point of MST
+    stidx = _leastcentralpt(g) # Least central point of MST
     η = elongation(g, stidx)
     bfst = bfs_tree(g, stidx)
     return g, stidx, η, bfst
 end
 
-
-"Ensure the size of the grid is compatible with the data in A. Create a grid if one was not provided."
+"""
+Ensure that the size of the 1-D grid, if provided, is compatible with the data in `A`.
+Create a grid if one was not provided.
+"""
 function ensuregrid!(A, grid=nothing)::AbstractVector
     if isnothing(grid)
         grid = float(collect(axes(A, 1)))
@@ -340,9 +346,10 @@ function ensuregrid!(A, grid=nothing)::AbstractVector
     grid
 end
 
-
 "Create a N x N proximity matrix from weighted edges of the given graph(s).
-Edge weights are provided as η coefficient(s) >= 1."
+Edge weights are provided as η coefficient(s) >= 1.
+For internal use only.
+"
 function _weighted_p_matrix(N, graphs, ηs)
     P = spzeros(N, N)
 # fill the proximity matrix with elongation-weighted reciprocal edge weights, treated as distances.
@@ -365,7 +372,7 @@ function _weighted_p_matrix(N, graphs, ηs)
 end
 
 "Return the index of the least central node in the given graph."
-leastcentralpt(g) = last(findmin(closeness_centrality(g)))
+_leastcentralpt(g) = last(findmin(closeness_centrality(g)))
 
 "Return the half-length or mean of the given path lengths (distances)."
 _halflen(paths) = mean(paths)
@@ -377,9 +384,10 @@ _halfwidth(paths) = mean(count(v -> v == k, paths) for k in unique(paths)) / 2
 
 `elongation(g, startidx)`
 
-Returns the ratio of the graph half-length (mean of path distances) over the 
+Returns the ratio of the graph g's half-length (mean of path distances) over the 
 half-width, defined as the mean count of shortest paths from the center node of a
-minimum spanning tree over the graph.
+minimum spanning tree over the graph. This function calls the `dijkstra_shortest_paths` 
+function in `LightGraphs`.
 """
 function elongation(G, startidx)
     spaths = dijkstra_shortest_paths(G, startidx, LightGraphs.DefaultDistance())
