@@ -80,7 +80,7 @@ function EMD(u,v,uw,vw)
     ndims(u) == 1 && ndims(u) == 1 || error("Only 1-d data vectors are supported.")
     length(u) == length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) == length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
-    cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 1)
+    _cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 1)
 end
 
 "Same as `EMD(u,v)` but using Distances-style runnable type syntax."
@@ -141,7 +141,7 @@ function Energy(u,v,uw,vw)
     length(u) ==  length(uw) || error("u and u weights must have same length. Got u $(length(u)) and uw $(length(uw))")
     length(v) ==  length(vw) || error("v and v weights must have same length. Got v $(length(v)) and vw $(length(vw))")
     ndims(u) == 1 && ndims(v) == 1 || error("Only 1-d data vectors are supported.")
-    sqrt(2) * cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 2)
+    sqrt(2) * _cdf_distance(ecdf(float(u); weights = float(uw)), ecdf(float(v); weights = float(vw)), 2)
 end
 
 
@@ -152,7 +152,7 @@ end
 Calculate Székely's energy distance between the two given vectors, accepting a default grid.
 `u` and `v` are treated as weights on the grid. The default grid is equal to the first axis of `u` and `v`.
 """
-function Energy(u,v)
+function Energy(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}
     gridu = collect(first(axes(u)))
     gridv = collect(first(axes(v)))
     Energy(gridu,gridv,u,v)
@@ -185,7 +185,7 @@ References (from the stats.py source code)
 >        Munos "The Cramer Distance as a Solution to Biased Wasserstein
 >        Gradients" (2017). :arXiv:`1705.10743`.
 """
-function cdf_distance(u::ECDF, v::ECDF, p::Int=1)
+function _cdf_distance(u::ECDF, v::ECDF, p::Int=1)
 
 # values are pre-sorted ascending
     uv = u.sorted_values
