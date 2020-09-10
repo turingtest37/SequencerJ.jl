@@ -1,25 +1,14 @@
 """
     SequencerResult
 
-Contains the results of a Sequencer run. Use the returned object to obtain details
-about the run results by calling the appropriate function.
-
-```julia
-
-julia> r = sequence(A; metrics=ALL_METRICS, scales=(1,2,4))
-┌ Info: Sequencing data with
-│     shape: (50, 100)
-│     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
-└     scale(s): (1, 2, 4)
-[...]
-julia> elong(r)
-1.3611293865541154e37
-
-julia> order(r)
-100-element Array{Int64,1}:
-[...]
-
+Type whose fields contain the results of a Sequencer run.
+```@example
+using SequencerJ #hide
+A = rand(10,10);
+r = sequence(A;);
+order(r)
 ```
+
 """
 struct SequencerResult
     EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
