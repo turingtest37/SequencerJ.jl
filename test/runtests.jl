@@ -269,11 +269,6 @@ using Images
         @test occursin("Sequencer Result", "$(seqres)")
     end
 
-    # TODO #19 figure out how to test for zero log output....
-    @testset "silent mode does not fail" begin
-        @test sequence(SMALL; scales=(2,), metrics=(L2,), silent=true) !== nothing
-    end
-
     @testset "prettyp of a vector" begin
         v = collect(1:20)
         r = "1,2,3...18,19,20"
