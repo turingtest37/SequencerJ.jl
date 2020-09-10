@@ -73,10 +73,9 @@ i2weight(x::AbstractVector) =  1 .- x ./ (maximum(x) + eps())
 
 """
     sequence(A::VecOrMat{T}; 
-        scales=(1, 4),
+        scales=nothing,
         metrics=ALL_METRICS,
         grid=nothing,
-        silent=false,
         weightrows=false,
         rowfn=i2weight,
         ) where {T <: Real}
@@ -137,7 +136,6 @@ function sequence(A::VecOrMat{T};
     scales=nothing, #auto-scale by default
     metrics=ALL_METRICS,
     grid=nothing,
-    silent=false,
     weightrows=false,
     rowfn=i2weight,
     ) where {T <: Real}
@@ -168,12 +166,12 @@ function sequence(A::VecOrMat{T};
 
     metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
     if scales === nothing
-        scales = _bestscale(A, metrics, grid, (silent, weightrows, rowfn))
+        scales = _bestscale(A, metrics, grid, (weightrows, rowfn))
         @info "After autoscaling, best scale = $(scales)..."
     end
     scales = tuplify(scales)
 
-    return _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
+    return _sequence(A, scales, metrics, grid, weightrows, rowfn)
 end
 
 "The scales used in the autoscale option"
@@ -205,7 +203,7 @@ end
 """
 The full algorithm. For internal use only.
 """
-function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
+function _sequence(A, scales, metrics, grid, weightrows, rowfn)
 
     # rows M and columns N in A
     M, N = size(A)
@@ -219,7 +217,7 @@ function _sequence(A, scales, metrics, grid, silent, weightrows, rowfn)
     if weightrows
         # force grid back to nothing here so that row sequencing uses its own grid
         # use all metrics at scale 1 for rows
-        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false, silent=silent);
+        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false);
         # get the optimal ordering for rows
         # method call seems to work only when fully qualified.
         rowseq = SequencerJ.order(r)
