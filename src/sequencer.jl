@@ -1,13 +1,13 @@
 """
     SequencerResult
+        EOSeg::Dict{Tuple,Any} # list of elongation and orderings (BFS,DFS), one per Segment    
+        EOAlgScale::Dict{Tuple,Any} # elongation and orderings for the cumulated weighted distances
+        D::AbstractMatrix # final distance matrix
+        mst::LightGraphs.AbstractGraph # final mst
+        η::Real # final elongation
+        order::AbstractVector #final ordering from bfs
 
-Type whose fields contain the results of a Sequencer run.
-```@example
-using SequencerJ #hide
-A = rand(10,10);
-r = sequence(A;);
-order(r)
-```
+Type containing the results of a Sequencer run.
 
 """
 struct SequencerResult
@@ -19,7 +19,14 @@ struct SequencerResult
     order::AbstractVector #final ordering from bfs
 end
 
-"Alias for elong"
+"""
+
+    η(r::SequencerResult)
+
+Alias for `elong`. The final graph elongation of a Sequencer run.
+
+Pro tip: write η using `\` followed by TAB `eta` at the Julia repl.
+"""
 η(r::SequencerResult) = elong(r)
 
 """
@@ -47,7 +54,7 @@ Return the elongation coefficient of the final, weighted graph.
 elong(r::SequencerResult) = r.η
 
 """
-
+   
     order(r::SequencerResult)
 
 Return the result column indices, as determined by the Sequencer algorithm.
@@ -55,18 +62,13 @@ Return the result column indices, as determined by the Sequencer algorithm.
 order(r::SequencerResult) = r.order
 
 "Sensibly display a SequencerResult object."
-show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(order(s)) ")
-
-"Convert index to weight"
-i2weight(x::AbstractVector) =  1 .- x ./ (maximum(x) + eps())
+show(io::IO, s::SequencerResult) = write(io, "Sequencer Result: η = $(@sprintf("%.4g", elong(s))), order = $(prettyp(order(s),5))")
 
 """
     sequence(A::VecOrMat{T}; 
         scales=nothing,
         metrics=ALL_METRICS,
         grid=nothing,
-        weightrows=false,
-        rowfn=i2weight,
         ) where {T <: Real}
 
 Analyze the provided `m x n` matrix (or m vectors of vectors n) by applying one or more 1-dimensional statistical metrics to 
@@ -108,25 +110,12 @@ julia> sequence(A; metrics=(WASS1D,L2), grid=collect(0.5:0.5:size(A,1))) # grid 
 ```
 
 The paper that describes the Sequencer algorithm and its applications can be found 
-on Arxiv: [https://arxiv.org/abs/2006.13948].
-```bibtex
-
-@misc{baron2020extracting,
-    title={Extracting the main trend in a dataset: the Sequencer algorithm},
-    author={Dalya Baron and Brice Ménard},
-    year={2020},
-    eprint={2006.13948},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG},
-    year=2020
-}
+on [Arxiv](https://arxiv.org/abs/2006.13948).
 """
 function sequence(A::VecOrMat{T}; 
     scales=nothing, #auto-scale by default
     metrics=ALL_METRICS,
     grid=nothing,
-    weightrows=false,
-    rowfn=i2weight,
     ) where {T <: Real}
 
     @assert all(sign.(A) .>= 0) && all(!any(isnan.(A)) && !any(isinf.(A))) "Input data cannot contain negative, NaN or infinite values."
@@ -150,36 +139,44 @@ function sequence(A::VecOrMat{T};
     # replace zeros and Infs with values that work for the math
     clamp!(A, eps(), typemax(eltype(A)))
     @debug "before ensure" grid
-    grid = ensuregrid!(A, grid)
-    @debug "after ensure" grid
+    G = ensuregrid!(A, grid)
+    @debug "after ensure" G
 
     metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
     if scales === nothing
-        scales = _bestscale(A, metrics, grid, (weightrows, rowfn))
-        @info "After autoscaling, best scale = $(scales)..."
+        scales = autoscale(A, metrics=metrics, grid=G)
+        @info "After autoscaling, best scale = $(scales)"
     end
     scales = tuplify(scales)
 
-    return _sequence(A, scales, metrics, grid, weightrows, rowfn)
+    return _sequence(A, scales, metrics, G)
 end
 
-"The scales used in the autoscale option"
-const FIB = [1,2,3,5,8,13,21,34,55,89,144,233,377]
+"Scales used in the autoscale option"
+const FIB = [1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,5168]
 
-"Sample columns of A and run the Sequencer algorithm against this subspace to identify the 
-scale at which elongation is greatest. Scales are members of the Fibonacci series, e.g. 1,2,3,5,8,13..."
-function _bestscale(A, m, g, params)
+"""
+Sample columns of A and run the Sequencer algorithm against this subspace to identify the 
+scale at which elongation is greatest. Scales are members of the Fibonacci series, e.g. 1,2,3,5,8,13...
+
+`metrics` and `grid` take the same options as in `sequence`. See [`sequence`](@ref).
+
+p sets the percentage of columns sampled (default = 0.1).
+"""
+function autoscale(A::AbstractMatrix; metrics=ALL_METRICS, grid=nothing, p = 0.1)
     M,N = size(A)
-    Ŋ = N ÷ 10  # nb of column samples. CAN THIS BE SMALLER?
+    Ŋ = round(Int, N * p, RoundDown)
+    @assert Ŋ > 1 "Matrix A contains too few columns ($(N)) to sample with p = $(p). Use a larger p."
     sampidx = sample(collect(axes(A,2)), (Ŋ,), ordered=true)
     Asamp = view(A, :, sampidx)
     minscale = 1
     maxscale = M ÷ 10 # no fewer than 10 rows = observations
+    @assert maxscale > 0 "Matrix A contains too few rows ($(M)) for autoscale. The minimum is 10 rows. It is recommended to set scale=(1,)."
     testscales = filter(i->i < maxscale, FIB)
     bestscale = 1
     max_η = 0
     for s in testscales
-        r = _sequence(Asamp, s, m, g, params...)
+        r = _sequence(Asamp, s, metrics, ensuregrid!(A, grid))
         η = elong(r)
         if η > max_η
             max_η = η
@@ -192,7 +189,7 @@ end
 """
 The full algorithm. For internal use only.
 """
-function _sequence(A, scales, metrics, grid, weightrows, rowfn)
+function _sequence(A, scales, metrics, grid)
 
     # rows M and columns N in A
     M, N = size(A)
@@ -201,20 +198,6 @@ function _sequence(A, scales, metrics, grid, weightrows, rowfn)
     η_all = []
     EOSeg = Dict{Tuple,Any}() # list of elongation and orderings (BFS,DFS), one per Segment    
     EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
-    Wr = ones(M) # identity
-    rowseq = collect(1:M) # row indices for applying row weight to column vectors
-    if weightrows
-        # force grid back to nothing here so that row sequencing uses its own grid
-        # use all metrics at scale 1 for rows
-        r = sequence(permutedims(A), scales=(1,), metrics=ALL_METRICS, grid=nothing, weightrows=false);
-        # get the optimal ordering for rows
-        # method call seems to work only when fully qualified.
-        rowseq = SequencerJ.order(r)
-        # weights are simply the reciprocal. Maybe look at a different formula? Linear? Wr = (1 .- rowseq ./ M)
-        Wr = rowfn(rowseq)
-    end
-    #row weight index; use this below to reorder Wr before chunking
-    rwidx = sortperm(rowseq)
 
     @inbounds for k in metrics
         alg = nothing
@@ -226,12 +209,13 @@ function _sequence(A, scales, metrics, grid, weightrows, rowfn)
             ηs = []
             # BFS sequence per chunk
             orderings = []
-            # split the data A, grid and row weights Wr into chunks
-            S, G, W = _splitnorm(A, grid, Wr[rwidx], l)
+            # split the data A and grid into chunks
+            # @show size(grid) l
+            S, G = _splitnorm(A, grid, l)
 
             # Each m row in S contains n segments of data,
             # one for each of n data series
-            tt = @elapsed for i in eachindex(S, G, W)
+            tt = @elapsed for i in eachindex(S, G)
                 # m is a chunk of the input data matrix
                 # local grid with the same dim 1 dimension as m
                 m, lgrid = S[i], G[i]
@@ -245,12 +229,6 @@ function _sequence(A, scales, metrics, grid, weightrows, rowfn)
                     alg = k
                 end
                 @debug "alg" alg
-                # Weight the columns by the appropriate row weights (default = 1)
-                # @debug "W[i] m[:,1:end]" W[i] m[:,1:end]
-                mp = W[i] .* m[:,1:end]
-                # @debug "W[i] .* m[:,1:end]" mp
-                m .= mp
-                # map!( (c) -> W[i] .* c, m, collect(eachcol(m)))
 
                 # All the heavy lifting happens here, in the distance calculations
                 Dklm = abs.(pairwise(alg, m; dims=2)) .+ ϵ
@@ -405,9 +383,13 @@ function _mst(dm::AbstractMatrix)
 end
 
 
-"Split the given `m x n` matrix and grid into `scale` parts along the column dimension such
-that the resulting matrices (chunks) are approximately of dimension `k x n` where `k ≊ m / scale`"
-function _splitnorm(A::AbstractMatrix{T}, grid, rw, scale) where {T <: Real}
+"""
+Split the given `m x n` matrix and grid into `scale` parts along the column dimension such
+that the resulting matrices (chunks) are approximately of dimension `k x n` where `k ≊ m / scale`
+
+Each chunk is normalized to sum to 1 (required for balanced tranpsort algorithms.)
+"""
+function _splitnorm(A::AbstractMatrix{T}, grid, scale) where {T <: Real}
 
     @assert scale <= length(A[:,1]) "Scale ($(scale)) cannot be larger than the number of data elements ($(length(A[:,1])))."
 
@@ -416,24 +398,22 @@ function _splitnorm(A::AbstractMatrix{T}, grid, rw, scale) where {T <: Real}
     chunklen = cld(M, scale)
     slices = []
     grids = []
-    weights = []
 
     chunkstrt = 1:chunklen:M # the starting indices for each chunk
 
     for i in chunkstrt
         ii = i + chunklen - one(i) # the end index for the chunk
         ii = clamp(ii, one(ii), M)  # keepin' it real....
+        # @show i ii
         S = A[i:ii, :] # a subset of rows, all columns
         G = grid[i:ii]
-        W = rw[i:ii]
         # now normalize each column of the slice
         Σslice = sum(S, dims=1)
         push!(slices, S ./ Σslice)
         push!(grids, G)
-        push!(weights, W)
     end
-    return slices, grids, weights
-    end
+    return slices, grids
+end
 
 EOSeg = Dict{Tuple,Any}() # Dictionary of per-segment intermediate elongation and sequence results
 EOAlgScale = Dict{Tuple,Any}() # elongation and orderings for the cumulated weighted distances
