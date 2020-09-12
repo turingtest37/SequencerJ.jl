@@ -23,9 +23,8 @@ end
 
     η(r::SequencerResult)
 
-Alias for `elong`. The final graph elongation of a Sequencer run.
+Alias for `elong`, returns the final graph elongation of a Sequencer run. (Greek letter `eta`)
 
-Pro tip: write η using `\` followed by TAB `eta` at the Julia repl.
 """
 η(r::SequencerResult) = elong(r)
 
@@ -144,7 +143,9 @@ function sequence(A::VecOrMat{T};
 
     metrics = (metrics !== nothing) ? tuplify(metrics) : ALL_METRICS
     if scales === nothing
-        scales = autoscale(A, metrics=metrics, grid=G)
+        with_logger(NullLogger()) do
+            scales = autoscale(A, metrics=metrics, grid=G)
+        end
         @info "After autoscaling, best scale = $(scales)"
     end
     scales = tuplify(scales)
