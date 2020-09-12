@@ -4,7 +4,7 @@ using SequencerJ
 makedocs(
     sitename = "SequencerJ",
     format = Documenter.HTML(),
-    modules = [SequencerJ],
+    modules = [SequencerJ, Distances],
     pages = [
         "ABCs of SequencerJ" => "index.md",
         "Metrics" => "algorithms.md",

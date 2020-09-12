@@ -1,6 +1,6 @@
 # SequencerJ
 
-SequencerJ is a pure [Julia](https://julialang.org/) implementation of the [Sequencer Algorithm](https://github.com/dalya/Sequencer/), a data analysis tool (first developed in python) to identify and extract the principal trends in a set of 1-d data vectors.
+__SequencerJ__ is a pure [Julia](https://julialang.org/) implementation of the [Sequencer Algorithm](https://github.com/dalya/Sequencer/), a data analysis tool to identify and extract the principal trends in a set of 1-d data vectors.
 
 Getting started with SequencerJ is easy. From the Julia REPL:
 ```julia
@@ -43,8 +43,9 @@ You may get **WARN**INGs upon compilation. You can safely ignore them for most p
 The Sequencer also calculates a fitness coefficient `η` (`\eta`+`TAB` at the REPL) that can be used to compare quality of solutions using various metrics and scales against the same data. Bigger is better. η is also called `elongation` in SequencerJ. The accessor is `elong`.
 ```julia
     julia> eta = elong(seqres)
+    6.2345
 ```
-More and better docs on the way!
+
 
 The paper that describes the Sequencer algorithm and its applications can be found 
 on Arxiv: [https://arxiv.org/abs/2006.13948].

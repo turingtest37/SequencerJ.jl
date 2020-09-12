@@ -1,50 +1,56 @@
 # SequencerJ.jl
 
-## Installing SequencerJ
+```@meta
+CurrentModule = SequencerJ
+```
+
+## Installation
 
 SequencerJ is *not yet* a registered package, but installing it requires mere whispers of additional keystroke beyond those for a regular package:
 
-```
-`]`add "https://github.com/turingtest37/SequencerJ.jl/"
+```julia
+
+`]` add "https://github.com/turingtest37/SequencerJ.jl/"
+
 ```
 The `]` key switches the REPL into package manager mode. The `add` command accepts a URL. The  `delete` key gets you back to the REPL.
 
-Alternatively you may stay in the REPL:
+Alternatively you can stay in the REPL:
 
 ```@repl
-using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
-[...]
-using SequencerJ
-[ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
-[...]
+using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"));
 ```
 You may get **WARN**INGs upon compilation. You can safely ignore them for most purposes, but if you are developing SequencerJ locally and use the `Revise` package, note that you may have to restart your Julia environment more often than usual.
 
-
 ## Using SequencerJ
 
-Getting started with SequencerJ is straightforward:
+Getting started with SequencerJ is straightforward. First, we need to wrangle some data to analyze. For a quick (but unpromising) start, let's use a random array.
+```@repl 1
+using SequencerJ
 
-First, we need to wrangle some data to analyze. For a quick (but unpromising) start, let's use a random array.
-```@example 1
-A = rand(100,50); #hide
-r = sequence(A)
+A = rand(100,50);
+r = sequence(A);
 ```
 The `sequence` method is the primary interface to SequencerJ. Only the input matrix or vector A is required. All other options use their defaults: `scales=nothing` enables autoscaling to find the best row segmentation; `metrics=ALL_METRICS` enables all supported measurement; `grid=nothing` forces automatic grid creation.
-See [`sequence(A;)`](@ref)
+See [`sequence`](@ref)
 
 Data and statistics from a sequencing run are encapsulated in a [`SequencerResult`](@ref).
-```@example 1
-typeof(r)
+
+```@repl 1
+r
 ```
 
-Use SequencerJ's accessor functions to get the details of a run. The result data sequence (1-based *column* indices, not 0-based row indices as in Sequencer for python) can be obtained with [`order`]@ref.
-```@example 1
+Use SequencerJ's accessor functions to get the details of a run. The result data sequence (1-based *column* indices, not 0-based row indices as in Sequencer for python) can be obtained with the [`order`](@ref) function.
+
+```@repl 1
+
 order(r)
+
 ```
 
 A key feature of the Sequencer algorithm is the calculated *elongation* of the minimum spanning tree that describes the best fit sequence. See [`elong`](@ref)
-```@example 1
+
+```@repl 1
 elong(r)
 ```
 ### A Better Example
@@ -53,8 +59,10 @@ Random data looks pretty boring from every direction, so let's apply the Sequenc
 The `resources` folder contains test images you can use to play with SequencerJ.
 
 ```@example 2
-using SequencerJ #hide
-using Images #hide
+using SequencerJ
+using Random
+using Images
+
 img = load(joinpath(@__DIR__, "..", "..","resources","bread.jpeg"))
 ```
 
@@ -68,174 +76,149 @@ Let's slice up this loaf of bread with a different kind of knife...
 
 ```@example 2
 A = convert(Matrix{Float32}, imgg);
-shuff_idx = shuffle(axes(A,2))
+shuff_idx = shuffle(axes(A,2));
+prettyp(shuff_idx, 3)
 ```
 
-Applying the shuffled index to the bread image columns creates a lot of crumbs...
+Reordering the image with a shuffled column index creates a lot of bread crumbs!
 
 ```@example 2
 As = A[:, shuff_idx]
 colorview(Gray, As)
 ```
 
-Now let SequencerJ put back together the pieces, without cheating! First,
-run SequencerJ against the shuffled matrix. I chose KLD and L2 because I know they work well on image data. Please experiment!
+
+Now let's put back together the pieces. We run SequencerJ against the shuffled matrix,
+and gather the best sequence as a column index.
 
 ```@example 2
-seqres = sequence(As, metrics=(KLD, L2)) #hide
-```
-
-It's not printed here, but the Sequencer outputs log messages as it works. For a more 
-silent treatment, try:
-
-```@example 2
-using Logging; disable_logging(Logging.Error)
-seqres = sequence(As, metrics=(KLD, L2)) #hide
-disable_logging(Logging.Info) # put it back!
-```
-
-The `SequencerResult` object contains the data we need to piece back together our loaf of bread.
-
-```@example 2
+seqres = sequence(As, metrics=(KLD, L2))
 bestguessidx = SequencerJ.order(seqres)
+```
+
+Drum roll, please!
+
+```@example 2
 colorview(Gray, As[:, bestguessidx])
 ```
 
-The Sequencer sometimes fails to reassemble images completely. Usually this is because the
-images are too small along the row dimension and therefore do not contain enough data to allow the algorithm to discriminate correctly between similar columns of data. To ensure best performance, images should be presented in "portrait" mode, with more rows than columns. Let's do that.
+Oops, the image is mirrored. That's easy to fix:
 
 ```@example 2
-permutedims!(As) #hide
-seqres = sequence(As, metrics=(KLD, L2)) #hide
-betterguessidx = SequencerJ.order(seqres) #hide
-colorview(Gray, As[:, bestguessidx])
+colorview(Gray, As[:, reverse(bestguessidx)])
 ```
 
-### Playing with scales and metrics
 
-With no other arguments, `sequence` applies all algorithms it knows to the data, each one at scales of 1, 2 and 4. Scale means the number of parts into which the data is partitioned. Each section or *chunk* contains approximately `size(A,1)/scale` elements. For example, 100 rows at scale 3 will result in chunks of 33, 33, and 34 rows.
+Voilà!
 
-Set scale using the `scales` keyword:
-```@example 2
-r = sequence(A, scales=(1,3))
+!!! warning "Failure is an option"
+    The Sequencer sometimes fails to reassemble images completely. Usually this is because an image is too small along the row dimension and therefore does not contain enough data to allow the algorithm to discriminate correctly between similar columns of data. To ensure best performance, images should be presented in "portrait" mode, with more rows than columns.
+    
+See a full example of portrait mode here [Data in Portrait Mode](@ref)
 ```
 
-Similarly, distance algorithms may be specified with the `metrics` keyword.
-```@example 2
-r = sequence(A, scales=(1,3), metrics=(L2,ENERGY))
-```
-For more on the metrics see [`Distances.SqEuclidian`](@ref), [`EMD`](@ref), [`Distances.KLDivergence`](@ref), [`Energy`](@ref) 
-
-By default, `sequence` prints out informative messages as it works. The `silent=true` keyword argument puts an end to that behavior.
-```@example 2
-r = sequence(A; silent=true)
-```
+## Metrics
 
 To make sense of A, we must choose which statistical distance metrics to apply. Each metric compares A pairwise, column by column, to create a distance matrix. The matrix is analyzed using graph theory to identify an *optimal* ordering of columns in A.
 
+This optimal sequence represents the least-cost path through the distance matrix and hence the closest affinities between columns, as proximity is the inverse of distance. See [The Sequencer Algorithm](@ref)
+
+SequencerJ currently supports four metrics:
+
+  * L2 - [`SqEuclidian`](@ref)
+  * Earth Mover's Distance - [`EMD`](@ref)
+  * Kullback-Lubler divergence - [`KLDivergence`](@ref)
+  * Szekely's energy distance - [`Energy`](@ref)
 
 
-This optimal sequence represents the least-cost path through the distance matrix and hence the closest affinities between columns, as proximity is the inverse of distance. The algorithm is described in detail [in the paper](https://arxiv.org/abs/2006.13948)[^paper].
+With no other arguments, `sequence` applies all algorithms it knows to the data (`metrics = ALL_METRICS`). Distance algorithms may be specified individually or in groups with the `metrics` keyword.
 
-
-
-SequencerJ currently supports four metrics that A using L2, Earth Mover's Distance, the Kullback-Lubler divergence, and Szekely's energy metric.
-
+```julia
+r = sequence(A, scales=(1,3), metrics=(L2,ENERGY))
 ```
+
+To specify a single metric, write it as a 1-tuple:
+
+```julia
+r = sequence(A, scales=(1,3), metrics=(L2,))
 ```
 
-The `resources` directory contains sample images that make better target practice for the Sequencer.
+## Scales
 
+The default `scale` is chosen by an "autoscaling" algorithm that samples the columns, runs the Sequencer on this subset at several scales (currently, the Fibonacci sequence), and compares them. The scale producing the greatest elongation is chosen to run on the full data set. You may force autoscaling with (`scales=nothing`).
 
+```julia
+sequence(A, scales=nothing)
+```
 
-```@example 2
-    julia> m = ALL_METRICS
-    (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+Scale means the number of parts into which the data is partitioned. Each section or *chunk* contains approximately `size(A,1)/scale` elements. For example, 100 rows at scale 3 will result in chunks of 33, 33, and 34 rows. Set scales manually using the `scales` keyword:
 
-    julia> s = (1,2,4)
-    (1, 2, 4)
+```julia
+r = sequence(A, scales=(1,3))
+```
 
-    julia> sequence(A; metrics=m, scales=s)
-    ┌ Info: Sequencing data with
-    │     shape: (50, 100)
-    │     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
-    └     scale(s): (1, 2, 4)
-    [ Info: SqEuclidean(0.0) at scale 1: η = 2.716 (3.7s)
-    [ Info: SqEuclidean(0.0) at scale 2: η = 3.867 (0.012s)
-    [ Info: SqEuclidean(0.0) at scale 4: η = 3.528 (0.038s)
-    [ Info: EMD(nothing) at scale 1: η = 6.83 (1.4s)
-    [ Info: EMD(nothing) at scale 2: η = 5.385 (0.12s)
-    [ Info: EMD(nothing) at scale 4: η = 4.286 (0.19s)
-    [ Info: KLDivergence() at scale 1: η = 3.355 (0.17s)
-    [ Info: KLDivergence() at scale 2: η = 3.745 (0.021s)
-    [ Info: KLDivergence() at scale 4: η = 2.867 (0.052s)
-    [ Info: Energy(nothing) at scale 1: η = 6.086 (0.19s)
-    [ Info: Energy(nothing) at scale 2: η = 5.036 (0.11s)
-    [ Info: Energy(nothing) at scale 4: η = 4.665 (0.2s)
-    [ Info: Final average elongation: 3.036
-    [ Info: Final ordering: [76, 47, 87, 56, 14, 7, 68, 93, 88, 73, 71, 66, 95, 72, 34, 30, 53, 11, 4, 99, 3, 92, 78, 69, 67, 90, 39, 98, 80, 77, 42, 62, 59, 48, 45, 31, 15, 89, 22, 51, 94, 64, 41, 28, 58, 91, 82, 52, 27, 44, 10, 35, 50, 24, 2, 75, 96, 63, 55, 33, 26, 43, 1, 12, 18, 17, 5, 60, 49, 54, 85, 84, 81, 25, 40, 32, 6, 46, 100, 38, 19, 37, 36, 20, 16, 23, 57, 13, 97, 61, 9, 29, 8, 86, 74, 70, 65, 21, 79, 83]
-    Sequencer Result: η = 3.036, order = [76, 47, 87, 56, 14, 7, 68, 93, 88, 73, 71, 66, 95, 72, 34, 30, 53, 11, 4, 99, 3, 92, 78, 69, 67, 90, 39, 98, 80, 77, 42, 62, 59, 48, 45, 31, 15, 89, 22, 51, 94, 64, 41, 28, 58, 91, 82, 52, 27, 44, 10, 35, 50, 24, 2, 75, 96, 63, 55, 33, 26, 43, 1, 12, 18, 17, 5, 60, 49, 54, 85, 84, 81, 25, 40, 32, 6, 46, 100, 38, 19, 37, 36, 20, 16, 23, 57, 13, 97, 61, 9, 29, 8, 86, 74, 70, 65, 21, 79, 83]
+To choose only one scale, write it as a 1-tuple:
 
+```julia
+r = sequence(A, scales=(4,))
+```
 
-# Use accessor functions to get details of the results
+## Output
 
+Use accessor functions to get details from the `SequencerResult`.
 
- Final distance matrix   
+```@repl accessors
+using SequencerJ #hide
+A = rand(2000, 100);
+r = sequence(A);
+```
 
-    julia> D(result)
-    100×100 SparseArrays.SparseMatrixCSC{Float64,Int64} with 10000 stored entries:
-    [1  ,   1]  =  1.0e-6
-    [2  ,   1]  =  Inf
-    [...]
-    [99 , 100]  =  Inf
-    [100, 100]  =  1.0e-6
+Best column sequence: [`order`](@ref)
+```@repl accessors
+order(r)
+```
+
+Final elongation: [`elong`](@ref)
+```@repl accessors
+elong(r)
+```
+
+Final elongation: [`mst`](@ref)
+```@repl accessors
+mst(r)
+```
+
+Final distance matrix: [`D`](@ref)
+```@repl accessors
+D(r)
+```
 
 Per-segment intermediate results:
-
-    julia> r = result.EOSeg;
-
-    julia> r[KLD,2]
-    (Any[4.139200000000001, 2.7687999999999997], Any[{100, 99} directed simple Int64 graph, {100, 99} directed simple Int64 graph])
-
-    julia> η, mst = r[KLD,2]
-    (Any[4.139200000000001, 2.7687999999999997], Any[{100, 99} directed simple Int64 graph, {100, 99} directed simple Int64 graph])
-
-    julia> η = first(r[KLD,2])
-    2-element Array{Any,1}:
-    4.139200000000001
-    2.7687999999999997
+```@repl accessors
+using Base.Iterators
+segDict = r.EOSeg;
+for (k,l) in Iterators.take(keys(segDict), 3)
+    η, mst = segDict[(k,l)]
+end
+segDict[KLD]
+η, mst = segDict[(KLD,2)]
+η = first(segDict[(KLD,2)])
+```
 
 Collect the mean elongations across segments for each metric+scale
+```@repl accessors
+collect(StatsBase.mean(first(v)) for (k,v) in r)
+```
 
-    julia> collect(StatsBase.mean(first(v)) for (k,v) in r)
-    12-element Array{Float64,1}:
-    6.0466
-    8.0551
-    7.6366
-    [...]
+In a similar fashion, get final elongations and the MST for each metric+scale:
+```@repl accessors
+rk = r.EOAlgScale
+```
 
-In a similar fashion, get final elongations and the MST for each metric+scale
+## The Sequencer Algorithm
 
-    julia> rk = result.EOAlgScale
-    Dict{Tuple,Any} with 12 entries:
-    (SqEuclidean(0.0), 4) => (3.5284, {100, 99} directed simple Int64 graph)
-    (EMD(nothing), 4)     => (4.2864, {100, 99} directed simple Int64 graph)
-    (Energy(nothing), 4)  => (4.6652, {100, 99} directed simple Int64 graph)
-    (SqEuclidean(0.0), 2) => (3.8672, {100, 99} directed simple Int64 graph)
-    (KLDivergence(), 1)   => (3.3548, {100, 99} directed simple Int64 graph)
-    (SqEuclidean(0.0), 1) => (2.716, {100, 99} directed simple Int64 graph)
-    (EMD(nothing), 2)     => (5.3852, {100, 99} directed simple Int64 graph)
-    (Energy(nothing), 1)  => (6.0862, {100, 99} directed simple Int64 graph)
-    (KLDivergence(), 4)   => (2.8672, {100, 99} directed simple Int64 graph)
-    (Energy(nothing), 2)  => (5.0356, {100, 99} directed simple Int64 graph)
-    (EMD(nothing), 1)     => (6.83, {100, 99} directed simple Int64 graph)
-    (KLDivergence(), 2)   => (3.745, {100, 99} directed simple Int64 graph)
+The algorithm is described in detail [in the paper available on Arxiv](https://arxiv.org/abs/2006.13948)
 
-
-
-
-
-[^paper]
     @misc{baron2020extracting,
     title={Extracting the main trend in a dataset: the Sequencer algorithm},
     author={Dalya Baron and Brice Ménard},
@@ -245,5 +228,5 @@ In a similar fashion, get final elongations and the MST for each metric+scale
     primaryClass={cs.LG},
     year=2020
 }
-    As another example of how the Sequencer algorithm may be used, see [Mapping Earth's deepest secrets](https://science.sciencemag.org/content/368/6496/1183).
 
+As another example of how the Sequencer algorithm may be used, see [Mapping Earth's deepest secrets](https://science.sciencemag.org/content/368/6496/1183).
