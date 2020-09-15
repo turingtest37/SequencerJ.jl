@@ -7,7 +7,7 @@ using Images
 
 @testset "SequencerJ.jl" begin
 
-    Random.seed!(2732);
+    # Random.seed!(2732);
 
     include("algotests.jl")
 
