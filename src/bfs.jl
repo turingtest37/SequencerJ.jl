@@ -3,7 +3,7 @@ Overload of LightGraphs.bfs_parents that provides an alternative outneighbors fu
 
 See [`LightGraphs.bfs_parents`](@ref)
 """
-bfs_parents(g::AbstractGraph, s::Integer; dir = :out) =
+LightGraphs.bfs_parents(g::AbstractGraph, s::Integer; dir = :out) =
     (dir == :out) ?
     LightGraphs._bfs_parents(g, s, outneighbors_ranked) :
     LightGraphs._bfs_parents(g, s, inneighbors)
