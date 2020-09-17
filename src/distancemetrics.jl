@@ -6,8 +6,8 @@ const ϵ = 1e-6
     EMD
 
 Earth Mover's Distance, a.k.a. 1-p Monge-Wasserstein distance. The algorithm as 
-implemented here assumes balanced transport where both vectors have the same statistical mass
-(they both sum to 1). Input vectors should be normalized to sum to 1.
+implemented here assumes *balanced* transport where both vectors have the same statistical mass
+(they both sum to 1). If they are not already, input vectors will be normalized to sum to 1.
 
 """
 struct EMD <: SemiMetric
@@ -53,7 +53,7 @@ end
 Calculate the Earth Mover's Distance using an explicit grid. This method is not intended to be called directly.
 Instead, specify a grid in the call to sequence, with the WASS1D constant.
 
-```julia-repl
+```julia
 
 julia> A = rand(50, 100)
 50×100 Array{Float64,2}:
@@ -70,9 +70,9 @@ julia> g = collect(0.5:0.5:div(size(A,1),2))
 julia> sequence(A; grid = g)
 ┌ Info: Sequencing data with
 │     shape: (50, 100)
-│     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+│     metric(s): (Euclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 └     scale(s): (1, 2, 4)
-[ Info: `SqEuclidean(0.0) at scale 1: η = 5.214 (3.4s)
+[ Info: `Euclidean(0.0) at scale 1: η = 5.214 (3.4s)
 [...]
 ```
 """
@@ -112,7 +112,7 @@ emd(u,v,uw,vw) = EMD(u,v,uw,vw)
 Energy distance as defined by Székely. An explicit grid may be provided. Default is 
 `axes(u,1)` and `axes(v,1)`.
 
-[Energy distance](https://en.wikipedia.org/wiki/Energy_distance)
+[Wikipedia page on Energy distance](https://en.wikipedia.org/wiki/Energy_distance)
 
 """
 struct Energy <: SemiMetric
@@ -222,9 +222,9 @@ end
 # *********** CONSTANTS ************
 
 """
-Constant to use when specifying the Square Euclidean or L2 distance metric for a sequencing run.
+Constant to use when specifying the Euclidean or L2 distance metric for a sequencing run.
 """
-const L2 = Distances.SqEuclidean()
+const L2 = Distances.Euclidean()
 
 """
 Constant for specifiying the Kullbach-Leibler Divergence metric.
@@ -234,12 +234,15 @@ const KLD = Distances.KLDivergence()
 """
 Constant for specifiying the Monge-Wasserstein a.k.a. 1-p Wasserstein a.k.a. Earth Mover's Distance (EMD) metric.
 This metric is sensitive to the underlying grid. Default is unit grid taken from the axes of the data vector.
+
+See [EMD]@ref
 """
 const WASS1D = EMD()
 
 """
 Constant for specifiying the Energy distance as defined by Székely.
-[Wikipedia article](https://en.wikipedia.org/wiki/Energy_distance)
+
+See [Energy](@ref)
 """
 const ENERGY = Energy()
 

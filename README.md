@@ -16,7 +16,7 @@ You may get **WARN**INGs upon compilation. You can safely ignore them for most p
     julia> A = rand(50,100); #some data to process. 
 
     julia> m = ALL_METRICS
-    (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+    (Euclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
 
     julia> s = (1,2,4)
     (1, 2, 4)
@@ -24,7 +24,7 @@ You may get **WARN**INGs upon compilation. You can safely ignore them for most p
     julia> seqres = sequence(A; metrics=m, scales=s)
     ┌ Info: Sequencing data with
     │     shape: (50, 100)
-    │     metric(s): (SqEuclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
+    │     metric(s): (Euclidean(0.0), EMD(nothing), KLDivergence(), Energy(nothing))
     └     scale(s): (1, 2, 4)
     [...]
 ```

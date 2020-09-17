@@ -45,18 +45,11 @@ prettyp
 ```
 
 ## Metrics
-```@docs
 
-[`KLD`](@ref)
-[`L2`](@ref)
-[`ENERGY`](@ref)
-[`WASS1D`](@ref)
-[`ALL_METRICS`](@ref)
-
-```
-
-```
-See [`SqEuclidean()`](@ref)
-See [`KLDivergence()`](@ref)
-```
-
+  * [`KLD`](@ref)
+  * [`L2`](@ref)
+  * [`ENERGY`](@ref)
+  * [`WASS1D`](@ref)
+  * [`ALL_METRICS`](@ref)
+  * [`Euclidean()`](@ref)
+  * [`KLDivergence()`](@ref)

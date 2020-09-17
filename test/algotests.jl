@@ -2,18 +2,18 @@
 
 @testset "Scaling and Distance Matrices" begin
 
-    #### L2 = Squared Euclidean
-        @testset "Squared Euclidean Distance Matrix" begin
+    #### L2 = Euclidean
+        @testset "Euclidean Distance Matrix" begin
             objs = [[1,1,1], [2,3,4]]
-            expected = [0. 14. ; 14. 0.]
+            expected = [0. sqrt(14) ; sqrt(14) 0.]
             A = permutedims(hcat(objs...)) # makes 2x3 array
-            @test pairwise(SqEuclidean(), A, dims = 1) == expected
+            @test pairwise(Euclidean(), A, dims = 1) ≈ expected
         end
 
-        @testset "SquaredEuclidean simple" begin
+        @testset "Euclidean simple" begin
             objs = [[1,1,1], [2,3,4]]
-            expected = float(14)
-            @test SqEuclidean()(objs...) == expected
+            expected = float(sqrt(14))
+            @test Euclidean()(objs...) ≈ expected
         end
 
 

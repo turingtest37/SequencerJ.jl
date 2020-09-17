@@ -115,7 +115,7 @@ Voilà!
     The Sequencer sometimes fails to reassemble images completely. Usually this is because an image is too small along the row dimension and therefore does not contain enough data to allow the algorithm to discriminate correctly between similar columns of data. To ensure best performance, images should be presented in "portrait" mode, with more rows than columns.
     
 See a full example of portrait mode here [Data in Portrait Mode](@ref)
-```
+
 
 ## Metrics
 
@@ -125,7 +125,7 @@ This optimal sequence represents the least-cost path through the distance matrix
 
 SequencerJ currently supports four metrics:
 
-  * L2 - [`SqEuclidian`](@ref)
+  * L2 - [`Euclidian`](@ref)
   * Earth Mover's Distance - [`EMD`](@ref)
   * Kullback-Lubler divergence - [`KLDivergence`](@ref)
   * Szekely's energy distance - [`Energy`](@ref)

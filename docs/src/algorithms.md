@@ -10,7 +10,7 @@ SequencerJ currently supports the four algorithms originally cited in the articl
 
 
 ```@docs
-SqEuclidean
+Euclidean
 KLDivergence
 EMD
 Energy
@@ -57,18 +57,18 @@ Setting the metrics keyword option as
 ```julia
 sequence(A, metrics=(L2, ENERGY))
 ```
-means to use `Distances.SqEuclidean()` and `SequencerJ.Energy()`.
+means to use `Distances.Euclidean()` and `SequencerJ.Energy()`.
 
 
 With equal effect, you can write:
 ```julia
-sequence(A, metrics=(SqEuclidean(), Energy())
+sequence(A, metrics=(Euclidean(), Energy())
 ```
 
 
-You can specify a threshold for the `SqEuclidean` calculations. To use, e.g., `1e-7` means round to zero any distance calculation results smaller than `1e-7`.
+You can specify a threshold for the `Euclidean` calculations. To use, e.g., `1e-7` means round to zero any distance calculation results smaller than `1e-7`.
 ```julia
-sequence(A, metrics=(SqEuclidean(1e-7), Energy())
+sequence(A, metrics=(Euclidean(1e-7), Energy())
 ```
 
 
