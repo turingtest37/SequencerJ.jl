@@ -26,7 +26,6 @@ elong
 order
 mst
 D
-η
 
 EMD()
 EMD(u::AbstractVector{T}, v::AbstractVector{T}) where {T <: Real}

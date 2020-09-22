@@ -187,7 +187,7 @@ using Images
 
     @testset "Accessor functions" begin    
         seqres = sequence(SMALL; scales=(2,), metrics=(L2,))
-        for f in (:elong, :order, :D, :mst, :η)
+        for f in (:elong, :order, :D, :mst)
             @testset "$f" begin
                 @eval @test $f($seqres) !==nothing
             end 

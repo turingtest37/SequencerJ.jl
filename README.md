@@ -40,7 +40,7 @@ You may get **WARN**INGs upon compilation. You can safely ignore them for most p
     [...]
 ```
 
-The Sequencer also calculates a fitness coefficient `η` (`\eta`+`TAB` at the REPL) that can be used to compare quality of solutions using various metrics and scales against the same data. Bigger is better. η is also called `elongation` in SequencerJ. The accessor is `elong`.
+The Sequencer also calculates a fitness coefficient `η` that can be used to compare quality of solutions using various metrics and scales against the same data. Bigger is better. η is returned by the `elong` function.
 ```julia
     julia> eta = elong(seqres)
     6.2345

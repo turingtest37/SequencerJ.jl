@@ -21,15 +21,6 @@ end
 
 """
 
-    η(r::SequencerResult)
-
-Alias for `elong`, returns the final graph elongation of a Sequencer run. (Greek letter `eta`)
-
-"""
-η(r::SequencerResult) = elong(r)
-
-"""
-
     D(r::SequencerResult)
 
 Return the final distance matrix from the Sequencer run.
