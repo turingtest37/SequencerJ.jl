@@ -10,7 +10,7 @@ using SimpleWeightedGraphs
 using StatsBase: mean, ecdf, ECDF, sample
 using LinearAlgebra: issymmetric, Symmetric, I
 
-
+import Distances: Euclidean, KLDivergence, PeriodicEuclidean
 import LightGraphs: bfs_parents, _bfs_parents
 import Base: show
 

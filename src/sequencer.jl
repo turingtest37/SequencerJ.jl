@@ -155,7 +155,7 @@ scale at which elongation is greatest. Scales are members of the Fibonacci serie
 
 p sets the percentage of columns sampled (default = 0.1).
 """
-function autoscale(A::AbstractMatrix; metrics=ALL_METRICS, grid=nothing, p = 0.1)
+function autoscale(A::AbstractMatrix; scales=FIB, metrics=ALL_METRICS, grid=nothing, p = 0.1)
     M,N = size(A)
     Ŋ = round(Int, N * p, RoundDown)
     @assert Ŋ > 1 "Matrix A contains too few columns ($(N)) to sample with p = $(p). Use a larger p."
@@ -316,9 +316,8 @@ function _weighted_p_matrix(N, graphs, ηs)
         η = ηs[idx]
         for e in edges(g)
             i, j = src(e), dst(e)
-            d = W[i,j] # weight as distance
-            # proximity is the inverse of distance
-            P[i,j] = P[j,i] += η * 1.0 / d
+            # proximity is the inverse of weight as distance
+            P[i,j] = P[j,i] += η * inv(W[i,j])
         end
     end
     # All P[i] were elongated using an η. Now divide by Ση to get the elongation-weighted average.

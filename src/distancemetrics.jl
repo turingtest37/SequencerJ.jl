@@ -2,6 +2,9 @@
 "Smallest allowed graph weight/distance (instead of 0, which does not play well with sparse graphs.)"
 const ϵ = 1e-6
 
+"Lower threshold for Euclidean distance calculations. Distances less than this are treated as 0."
+const L2THR = 1e-7
+
 """
     EMD
 
@@ -222,9 +225,13 @@ end
 # *********** CONSTANTS ************
 
 """
-Constant to use when specifying the Euclidean or L2 distance metric for a sequencing run.
+Constant to use when specifying the Euclidean or L2 distance metric for a sequencing run. This
+sets the default threshold to the value of [`L2THR`](@ref) = 1e-7.
+
+To set a different threshold level, use the type constructor `Distances.Euclidean(<your value>)` directly
+(i.e. instead of the `L2` constant).
 """
-const L2 = Distances.Euclidean()
+const L2 = Distances.Euclidean(L2THR)
 
 """
 Constant for specifiying the Kullbach-Leibler Divergence metric.
@@ -248,3 +255,7 @@ const ENERGY = Energy()
 
 "Convenience constant to represent all of L2, WASS1D, KLD, and ENERGY."
 const ALL_METRICS = (L2, WASS1D, KLD, ENERGY)
+
+"Less verbose output for PeriodicEuclidean."
+Base.show(io::IO, s::PeriodicEuclidean) = write(io, "PeriodicEuclidean($(length(s.periods))) [$(minimum(s.periods)),$(maximum(s.periods))]")
+

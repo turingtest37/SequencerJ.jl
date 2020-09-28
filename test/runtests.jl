@@ -9,19 +9,19 @@ using Images
 
     # Random.seed!(2732);
 
-    include("algotests.jl")
-
     # declare a loss function to measure the error in calculations
     loss(A,B) = L2(A, B)
-
+    
     imgsmall = Gray.(load(joinpath(@__DIR__,"..","resources","colony.png")))
     SMALL = convert(Matrix{Float32}, imgsmall)
-
+    
     imgmed = Gray.(load(joinpath(@__DIR__,"..","resources","Aged Whisky.jpg")));
     MED = convert(Matrix{Float32}, imgmed)
-
+    
     imgbig = Gray.(load(joinpath(@__DIR__,"..","resources","Hummingbird!.jpeg")))
     BIG = convert(Matrix{Float32}, imgbig)
+    
+    include("algotests.jl")
 
     @testset "autoscale produces one integer result" begin
         A = rand(100,100)
@@ -183,6 +183,56 @@ using Images
         ind = order(seqres)
         res = imgshuff[:, ind]
         @test loss(BIG,res) ≈ 0
+    end
+
+
+    @testset "PeriodicEuclidean small image scale=1" begin
+        Idx = shuffle(axes(SMALL,2))
+        imgshuff = SMALL[:,Idx]
+        ρ = rand()
+        # @show ρ
+        P = vec(fill(ρ, size(imgshuff,1))) # period = 0.5 per dimension
+        # @show P
+        seqres = sequence(imgshuff, metrics=(PeriodicEuclidean(P),), scales=(1,)) #autoscale, all metrics
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        # This way the test will also fail if the 
+        # reordering begins to work perfectly, i.e. loss ~ 0!
+        # @test loss(SMALL,res) ≈ 0
+        @test loss(SMALL,res) < 25
+    end
+
+    @testset "PeriodicEuclidean med image scale=1" begin
+        Idx = shuffle(axes(MED,2))
+        imgshuff = MED[:,Idx]
+        @show size(imgshuff)
+        ρ = 0.5
+        @show ρ
+        P = vec(fill(ρ, size(imgshuff,1))) # period = 0.5 per dimension
+        @show P
+        seqres = sequence(imgshuff, metrics=(PeriodicEuclidean(P),), scales=(1,)) #autoscale, all metrics
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        # This way the test will also fail if the 
+        # reordering begins to work perfectly, i.e. loss ~ 0!
+        # @test loss(MED,res) ≈ 0
+        @test loss(MED,res) < 30
+    end
+
+    @testset "PeriodicEuclidean large image scale=1" begin
+        Idx = shuffle(axes(BIG,2))
+        imgshuff = BIG[:,Idx]
+        @show size(imgshuff)
+        ρ = 0.5
+        @show ρ
+        P = vec(fill(ρ, size(imgshuff,1))) # period = 0.5 per dimension
+        seqres = sequence(imgshuff, metrics=(PeriodicEuclidean(P),), scales=(1,))
+        ind = order(seqres)
+        res = imgshuff[:, ind]
+        # This way the test will also fail if the 
+        # reordering begins to work perfectly, i.e. loss ~ 0!
+        # @test loss(BIG,res) ≈ 0
+        @test loss(BIG,res) < 5
     end
 
     @testset "Accessor functions" begin    
