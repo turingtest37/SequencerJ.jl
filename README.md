@@ -4,13 +4,13 @@ __SequencerJ__ is a pure [Julia](https://julialang.org/) implementation of the [
 
 Getting started with SequencerJ is easy. From the Julia REPL:
 ```julia
-    julia> using Pkg; Pkg.add(PackageSpec(url="https://github.com/turingtest37/SequencerJ.jl/"))
+    julia> using Pkg; Pkg.add("SequencerJ")
     [...]
     julia> using SequencerJ
     [ Info: Precompiling SequencerJ [348581b9-6e84-42e0-ac4e-fe9177c221e6]
     [...]
 ```
-You may get **WARN**INGs upon compilation. You can safely ignore them for most purposes, but if you are developing SequencerJ locally and use the `Revise` package, note that you may have to restart your Julia environment more often than usual.
+You may get **WARN**INGs upon compilation. Sorry, I'm working on that! You can safely ignore them for most purposes, but if you are developing SequencerJ locally and use the `Revise` package, note that you may have to restart your Julia environment more often than usual.
 
 ```julia
     julia> A = rand(50,100); #some data to process. 
